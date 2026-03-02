@@ -1,0 +1,176 @@
+import { Router, Response } from 'express';
+import { query } from '../db/pool';
+import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
+
+const router = Router();
+router.use(authenticate);
+router.use(requireRole('authority_admin', 'super_admin', 'manager'));
+
+// GET /api/dashboard/stats - main KPI stats
+router.get('/stats', async (req: AuthRequest, res: Response) => {
+  try {
+    const authorityId = req.user!.authority_id;
+
+    const [substitutes, assignments, absences, permits] = await Promise.all([
+      // Total active substitutes
+      query(`SELECT COUNT(*) as count FROM substitutes WHERE authority_id = $1 AND status = 'active'`, [authorityId]),
+
+      // Today's coverage
+      query(`
+        SELECT 
+          COUNT(*) FILTER (WHERE status IN ('confirmed','arrived','completed')) as covered,
+          COUNT(*) as total
+        FROM assignments a
+        JOIN kindergartens k ON a.kindergarten_id = k.id
+        WHERE k.authority_id = $1 AND a.assignment_date = CURRENT_DATE
+      `, [authorityId]),
+
+      // Open absences today
+      query(`
+        SELECT COUNT(*) as count FROM absence_reports ar
+        JOIN kindergartens k ON ar.kindergarten_id = k.id
+        WHERE k.authority_id = $1 AND ar.absence_date = CURRENT_DATE AND ar.status = 'open'
+      `, [authorityId]),
+
+      // Expiring permits (next 30 days)
+      query(`
+        SELECT COUNT(*) as count FROM substitutes 
+        WHERE authority_id = $1 
+        AND work_permit_expiry BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'
+      `, [authorityId]),
+    ]);
+
+    // Coverage this week
+    const weekCoverage = await query(`
+      SELECT 
+        a.assignment_date::date as date,
+        COUNT(*) FILTER (WHERE a.status NOT IN ('cancelled')) as assignments,
+        COUNT(*) FILTER (WHERE ar.status = 'open') as open_absences
+      FROM generate_series(
+        DATE_TRUNC('week', CURRENT_DATE),
+        DATE_TRUNC('week', CURRENT_DATE) + INTERVAL '6 days',
+        '1 day'
+      ) as a(assignment_date)
+      LEFT JOIN absence_reports ar ON ar.absence_date = a.assignment_date
+        AND ar.kindergarten_id IN (SELECT id FROM kindergartens WHERE authority_id = $1)
+      LEFT JOIN assignments a2 ON a2.assignment_date = a.assignment_date
+        AND a2.kindergarten_id IN (SELECT id FROM kindergartens WHERE authority_id = $1)
+      GROUP BY a.assignment_date::date
+      ORDER BY date
+    `, [authorityId]);
+
+    return res.json({
+      totalSubstitutes: parseInt(substitutes.rows[0].count),
+      todayCovered: parseInt(assignments.rows[0].covered || '0'),
+      todayTotal: parseInt(assignments.rows[0].total || '0'),
+      openAbsences: parseInt(absences.rows[0].count),
+      expiringPermits: parseInt(permits.rows[0].count),
+      weekCoverage: weekCoverage.rows,
+    });
+  } catch (error) {
+    console.error('Dashboard stats error:', error);
+    return res.status(500).json({ error: 'שגיאת שרת.' });
+  }
+});
+
+// GET /api/dashboard/coverage-by-neighborhood
+router.get('/coverage-by-neighborhood', async (req: AuthRequest, res: Response) => {
+  try {
+    const authorityId = req.user!.authority_id;
+    const { month, year } = req.query;
+
+    const result = await query(`
+      SELECT 
+        k.neighborhood,
+        COUNT(DISTINCT k.id) as kindergartens_count,
+        COUNT(a.id) FILTER (WHERE a.status NOT IN ('cancelled')) as total_assignments,
+        COUNT(a.id) FILTER (WHERE a.status = 'completed') as completed,
+        COUNT(ar.id) FILTER (WHERE ar.status = 'uncovered') as uncovered_absences,
+        ROUND(
+          COUNT(a.id) FILTER (WHERE a.status = 'completed')::numeric / 
+          NULLIF(COUNT(ar.id), 0) * 100
+        , 1) as coverage_pct
+      FROM kindergartens k
+      LEFT JOIN absence_reports ar ON ar.kindergarten_id = k.id
+        AND ($2::int IS NULL OR EXTRACT(MONTH FROM ar.absence_date) = $2)
+        AND ($3::int IS NULL OR EXTRACT(YEAR FROM ar.absence_date) = $3)
+      LEFT JOIN assignments a ON a.kindergarten_id = k.id
+        AND ($2::int IS NULL OR EXTRACT(MONTH FROM a.assignment_date) = $2)
+        AND ($3::int IS NULL OR EXTRACT(YEAR FROM a.assignment_date) = $3)
+      WHERE k.authority_id = $1
+      GROUP BY k.neighborhood
+      ORDER BY coverage_pct DESC NULLS LAST
+    `, [authorityId, month || null, year || null]);
+
+    return res.json(result.rows);
+  } catch (error) {
+    return res.status(500).json({ error: 'שגיאת שרת.' });
+  }
+});
+
+// GET /api/dashboard/alerts - urgent alerts
+router.get('/alerts', async (req: AuthRequest, res: Response) => {
+  try {
+    const authorityId = req.user!.authority_id;
+    const alerts: object[] = [];
+
+    // Uncovered absences today
+    const uncovered = await query(`
+      SELECT ar.id, k.name as kindergarten_name, ar.absent_employee_name
+      FROM absence_reports ar
+      JOIN kindergartens k ON ar.kindergarten_id = k.id
+      WHERE k.authority_id = $1 AND ar.absence_date = CURRENT_DATE AND ar.status = 'open'
+    `, [authorityId]);
+
+    uncovered.rows.forEach(r => alerts.push({
+      type: 'uncovered_absence',
+      severity: 'high',
+      message: `גן ${r.kindergarten_name}: ${r.absent_employee_name} נעדרת ואין מחליפה`,
+      data: r
+    }));
+
+    // Expiring permits in 7 days
+    const expiring = await query(`
+      SELECT u.first_name, u.last_name, s.work_permit_expiry
+      FROM substitutes s
+      JOIN users u ON s.user_id = u.id
+      WHERE s.authority_id = $1
+        AND s.work_permit_expiry BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'
+    `, [authorityId]);
+
+    expiring.rows.forEach(r => alerts.push({
+      type: 'permit_expiring',
+      severity: 'medium',
+      message: `תיק עובד של ${r.first_name} ${r.last_name} פג ב-${r.work_permit_expiry}`,
+      data: r
+    }));
+
+    // Known absences next week without coverage
+    const knownUnplanned = await query(`
+      SELECT ka.*, k.name as kindergarten_name
+      FROM known_absences ka
+      JOIN kindergartens k ON ka.kindergarten_id = k.id
+      WHERE k.authority_id = $1
+        AND ka.start_date BETWEEN CURRENT_DATE + 1 AND CURRENT_DATE + 7
+        AND NOT EXISTS (
+          SELECT 1 FROM assignments a 
+          WHERE a.kindergarten_id = ka.kindergarten_id 
+          AND a.assignment_date = ka.start_date
+          AND a.status NOT IN ('cancelled')
+        )
+    `, [authorityId]);
+
+    knownUnplanned.rows.forEach(r => alerts.push({
+      type: 'unplanned_known_absence',
+      severity: 'low',
+      message: `חופש מתוכנן ב-${r.kindergarten_name} ב-${r.start_date} — אין שיבוץ עדיין`,
+      data: r
+    }));
+
+    return res.json(alerts);
+  } catch (error) {
+    return res.status(500).json({ error: 'שגיאת שרת.' });
+  }
+});
+
+export default router;
