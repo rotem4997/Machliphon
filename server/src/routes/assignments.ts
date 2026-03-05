@@ -227,7 +227,7 @@ router.get('/export/csv', requireRole('manager', 'authority_admin'), async (req:
 
     const result = await query(`
       SELECT 
-        u.id_number, u.first_name || ' ' || u.last_name as name,
+        s.id_number, u.first_name || ' ' || u.last_name as name,
         k.name as kindergarten, k.address,
         a.assignment_date, a.start_time, a.end_time,
         a.hours_worked, a.hourly_rate, a.total_pay

@@ -105,9 +105,12 @@ router.patch('/:id', requireRole('manager', 'authority_admin', 'super_admin'), a
       return res.status(400).json({ error: 'אין שדות לעדכון.' });
     }
 
+    // Scope to authority
     params.push(req.params.id);
+    const authorityId = req.user!.authority_id;
+    params.push(authorityId);
     const result = await query(
-      `UPDATE absence_reports SET ${updates.join(', ')} WHERE id = $${paramIdx} RETURNING *`,
+      `UPDATE absence_reports SET ${updates.join(', ')} WHERE id = $${paramIdx} AND kindergarten_id IN (SELECT id FROM kindergartens WHERE authority_id = $${paramIdx + 1}) RETURNING *`,
       params
     );
 
@@ -126,8 +129,8 @@ router.patch('/:id', requireRole('manager', 'authority_admin', 'super_admin'), a
 router.delete('/:id', requireRole('manager', 'authority_admin', 'super_admin'), async (req: AuthRequest, res: Response) => {
   try {
     const result = await query(
-      'DELETE FROM absence_reports WHERE id = $1 RETURNING id',
-      [req.params.id]
+      'DELETE FROM absence_reports WHERE id = $1 AND kindergarten_id IN (SELECT id FROM kindergartens WHERE authority_id = $2) RETURNING id',
+      [req.params.id, req.user!.authority_id]
     );
 
     if (result.rows.length === 0) {
