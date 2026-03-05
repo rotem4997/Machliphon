@@ -1,14 +1,15 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { 
-  LayoutDashboard, Users, Calendar, ClipboardList, 
-  BarChart3, Settings, LogOut, Bell, Menu, X
+import {
+  LayoutDashboard, Users, Calendar, ClipboardList,
+  BarChart3, Settings, LogOut, Bell, Menu, X, Activity
 } from 'lucide-react';
 import { useState } from 'react';
-import { useAuthStore, UserRole } from '../../context/authStore';
+import { useAuthStore, UserRole } from '@/context/authStore';
 
 const navItems: Record<UserRole, { href: string; label: string; icon: React.ReactNode }[]> = {
   authority_admin: [
     { href: '/dashboard', label: 'לוח בקרה', icon: <LayoutDashboard size={18} /> },
+    { href: '/activity', label: 'פעילות חיה', icon: <Activity size={18} /> },
     { href: '/substitutes', label: 'מחליפות', icon: <Users size={18} /> },
     { href: '/assignments', label: 'שיבוצים', icon: <Calendar size={18} /> },
     { href: '/absences', label: 'היעדרויות', icon: <ClipboardList size={18} /> },
@@ -17,6 +18,7 @@ const navItems: Record<UserRole, { href: string; label: string; icon: React.Reac
   ],
   manager: [
     { href: '/dashboard', label: 'לוח בקרה', icon: <LayoutDashboard size={18} /> },
+    { href: '/activity', label: 'פעילות חיה', icon: <Activity size={18} /> },
     { href: '/substitutes', label: 'מחליפות', icon: <Users size={18} /> },
     { href: '/assignments', label: 'שיבוצים', icon: <Calendar size={18} /> },
     { href: '/absences', label: 'היעדרויות', icon: <ClipboardList size={18} /> },

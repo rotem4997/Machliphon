@@ -3,8 +3,8 @@ import {
   Users, CheckCircle, AlertTriangle, Clock, 
   TrendingUp, RefreshCw, FileText
 } from 'lucide-react';
-import api from '../../utils/api';
-import { useAuthStore } from '../../context/authStore';
+import api from '@/utils/api';
+import { useAuthStore } from '@/context/authStore';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 import {
@@ -121,7 +121,15 @@ export default function DashboardPage() {
             <RefreshCw size={15} />
             רענן
           </button>
-          <button className="btn-primary flex items-center gap-2 text-sm">
+          <button
+            onClick={() => {
+              const now = new Date();
+              const month = now.getMonth() + 1;
+              const year = now.getFullYear();
+              window.open(`/api/assignments/export/csv?month=${month}&year=${year}`, '_blank');
+            }}
+            className="btn-primary flex items-center gap-2 text-sm"
+          >
             <FileText size={15} />
             ייצוא CSV
           </button>

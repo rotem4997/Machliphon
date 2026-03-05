@@ -9,6 +9,10 @@ import authRoutes from './routes/auth';
 import substitutesRoutes from './routes/substitutes';
 import assignmentsRoutes from './routes/assignments';
 import dashboardRoutes from './routes/dashboard';
+import absencesRoutes from './routes/absences';
+import kindergartensRoutes from './routes/kindergartens';
+import notificationsRoutes from './routes/notifications';
+import activityRoutes from './routes/activity';
 
 dotenv.config();
 
@@ -56,6 +60,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/substitutes', substitutesRoutes);
 app.use('/api/assignments', assignmentsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/absences', absencesRoutes);
+app.use('/api/kindergartens', kindergartensRoutes);
+app.use('/api/notifications', notificationsRoutes);
+app.use('/api/activity', activityRoutes);
 
 // ── 404 handler ──────────────────────────────────────────────
 app.use((req, res) => {

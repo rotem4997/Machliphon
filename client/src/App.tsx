@@ -8,6 +8,10 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import DashboardPage from './pages/DashboardPage';
 import SubstituteDashboard from './pages/SubstituteDashboard';
 import SubstitutesPage from './pages/SubstitutesPage';
+import AssignmentsPage from './pages/AssignmentsPage';
+import AbsencesPage from './pages/AbsencesPage';
+import ActivityDashboard from './pages/ActivityDashboard';
+import ReportsPage from './pages/ReportsPage';
 import { useAuthStore } from './context/authStore';
 
 const queryClient = new QueryClient({
@@ -46,10 +50,10 @@ export default function App() {
               >
                 <Route index element={<SubstitutesPage />} />
               </Route>
-              {/* More pages will be added here */}
-              <Route path="/assignments" element={<div className="text-slate-400 text-center py-20">בפיתוח...</div>} />
-              <Route path="/absences" element={<div className="text-slate-400 text-center py-20">בפיתוח...</div>} />
-              <Route path="/reports" element={<div className="text-slate-400 text-center py-20">בפיתוח...</div>} />
+              <Route path="/assignments" element={<AssignmentsPage />} />
+              <Route path="/absences" element={<AbsencesPage />} />
+              <Route path="/activity" element={<ActivityDashboard />} />
+              <Route path="/reports" element={<ReportsPage />} />
               <Route path="/settings" element={<div className="text-slate-400 text-center py-20">בפיתוח...</div>} />
               <Route path="/profile" element={<div className="text-slate-400 text-center py-20">בפיתוח...</div>} />
               <Route path="/availability" element={<div className="text-slate-400 text-center py-20">בפיתוח...</div>} />
