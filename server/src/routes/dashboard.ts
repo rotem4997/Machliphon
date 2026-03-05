@@ -42,20 +42,20 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
 
     // Coverage this week
     const weekCoverage = await query(`
-      SELECT 
-        a.assignment_date::date as date,
-        COUNT(*) FILTER (WHERE a.status NOT IN ('cancelled')) as assignments,
-        COUNT(*) FILTER (WHERE ar.status = 'open') as open_absences
+      SELECT
+        d.dt::date as date,
+        COUNT(a2.id) FILTER (WHERE a2.status NOT IN ('cancelled')) as assignments,
+        COUNT(ar.id) FILTER (WHERE ar.status = 'open') as open_absences
       FROM generate_series(
         DATE_TRUNC('week', CURRENT_DATE),
         DATE_TRUNC('week', CURRENT_DATE) + INTERVAL '6 days',
         '1 day'
-      ) as a(assignment_date)
-      LEFT JOIN absence_reports ar ON ar.absence_date = a.assignment_date
+      ) as d(dt)
+      LEFT JOIN absence_reports ar ON ar.absence_date = d.dt
         AND ar.kindergarten_id IN (SELECT id FROM kindergartens WHERE authority_id = $1)
-      LEFT JOIN assignments a2 ON a2.assignment_date = a.assignment_date
+      LEFT JOIN assignments a2 ON a2.assignment_date = d.dt
         AND a2.kindergarten_id IN (SELECT id FROM kindergartens WHERE authority_id = $1)
-      GROUP BY a.assignment_date::date
+      GROUP BY d.dt::date
       ORDER BY date
     `, [authorityId]);
 
