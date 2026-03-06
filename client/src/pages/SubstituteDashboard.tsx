@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle, XCircle, Calendar, MapPin, Clock, AlertCircle } from 'lucide-react';
-import api from '../../utils/api';
+import api from '@/utils/api';
 import toast from 'react-hot-toast';
 import { format, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';

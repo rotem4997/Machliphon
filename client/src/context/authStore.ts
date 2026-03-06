@@ -77,7 +77,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'machliphon-auth',
-      partialState: (state) => ({ token: state.token, refreshToken: state.refreshToken, user: state.user }),
+      partialize: (state: AuthState) => ({ token: state.token, refreshToken: state.refreshToken, user: state.user }),
     }
   )
 );

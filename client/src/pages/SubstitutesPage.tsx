@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Filter, Plus, CheckCircle, XCircle, Clock, Phone } from 'lucide-react';
-import api from '../../utils/api';
+import api from '@/utils/api';
 import toast from 'react-hot-toast';
 
 interface Substitute {
