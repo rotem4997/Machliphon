@@ -89,10 +89,22 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 });
 
 // ── Start ─────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`🚀 Machliphon server running on port ${PORT}`);
-  console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`   Health: http://localhost:${PORT}/health`);
-});
+import { runMigrations } from './db/migrate';
+
+async function start() {
+  try {
+    await runMigrations();
+  } catch (err) {
+    console.error('Migration failed, starting server anyway:', err);
+  }
+
+  app.listen(PORT, () => {
+    console.log(`🚀 Machliphon server running on port ${PORT}`);
+    console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`   Health: http://localhost:${PORT}/health`);
+  });
+}
+
+start();
 
 export default app;

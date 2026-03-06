@@ -2,9 +2,12 @@ import fs from 'fs';
 import path from 'path';
 import bcrypt from 'bcryptjs';
 import { query } from './pool';
-import pool from './pool';
 
-async function migrate() {
+/**
+ * Run migration inline (called from server startup, shares the same pool).
+ * Does NOT call pool.end() so the server can keep using the connection.
+ */
+export async function runMigrations() {
   console.log('🔄 Running migrations...');
 
   // Find schema.sql - handle both dev (src/) and prod (dist/) paths
@@ -18,7 +21,7 @@ async function migrate() {
   const found = candidates.find((p) => fs.existsSync(p));
   if (!found) {
     console.error('❌ schema.sql not found. Tried:', candidates);
-    process.exit(1);
+    throw new Error('schema.sql not found');
   }
 
   const schema = fs.readFileSync(found, 'utf-8');
@@ -34,7 +37,6 @@ async function migrate() {
     console.log('ℹ️  Data already exists, skipping seed');
   }
 
-  await pool.end();
   console.log('✅ Migration complete');
 }
 
@@ -120,7 +122,13 @@ async function seedData() {
   console.log('  director@yokneam.muni.il / Demo1234!');
 }
 
-migrate().catch((err) => {
-  console.error('❌ Migration failed:', err);
-  process.exit(1);
-});
+// Allow running standalone: node migrate.js
+if (require.main === module) {
+  const pool = require('./pool').default;
+  runMigrations()
+    .then(() => pool.end())
+    .catch((err: Error) => {
+      console.error('❌ Migration failed:', err);
+      process.exit(1);
+    });
+}
