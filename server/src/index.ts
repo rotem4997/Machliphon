@@ -102,10 +102,11 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // ── Error handler ────────────────────────────────────────────
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('Unhandled error:', err);
-  res.status(500).json({ 
-    error: process.env.NODE_ENV === 'production' ? 'שגיאת שרת.' : err.message 
+  res.status(500).json({
+    error: 'שגיאת שרת.',
+    debug: err.message,
   });
 });
 

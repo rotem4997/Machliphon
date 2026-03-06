@@ -3,22 +3,31 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+if (!process.env.DATABASE_URL) {
+  console.error('❌ FATAL: DATABASE_URL environment variable is not set!');
+  console.error('   On Railway: Add a PostgreSQL plugin and ensure DATABASE_URL is linked.');
+  console.error('   Locally: Create a .env file with DATABASE_URL=postgresql://...');
+}
+
 const config: PoolConfig = {
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: process.env.DATABASE_URL?.includes('localhost') ? false : { rejectUnauthorized: false },
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  connectionTimeoutMillis: 5000,
 };
 
 const pool = new Pool(config);
 
 pool.on('error', (err) => {
   console.error('Unexpected error on idle client', err);
-  process.exit(-1);
+  // Do NOT exit — let the server keep running so health endpoint works
 });
 
 export const query = async (text: string, params?: unknown[]) => {
+  if (!process.env.DATABASE_URL) {
+    throw new Error('DATABASE_URL is not configured. Add a PostgreSQL database to your Railway project.');
+  }
   const start = Date.now();
   try {
     const res = await pool.query(text, params);
