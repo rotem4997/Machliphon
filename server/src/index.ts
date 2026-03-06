@@ -58,8 +58,23 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 // ── Health check ─────────────────────────────────────────────
-app.get('/health', (_, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), env: process.env.NODE_ENV });
+app.get('/health', async (_, res) => {
+  const { query: dbQuery } = await import('./db/pool');
+  let dbStatus = 'unknown';
+  try {
+    await dbQuery('SELECT 1');
+    dbStatus = 'connected';
+  } catch (err: any) {
+    dbStatus = `error: ${err.message}`;
+  }
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV,
+    db: dbStatus,
+    hasDbUrl: !!process.env.DATABASE_URL,
+    hasJwtSecret: !!process.env.JWT_SECRET,
+  });
 });
 
 // ── Routes ───────────────────────────────────────────────────
@@ -98,6 +113,12 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 import { runMigrations } from './db/migrate';
 
 async function start() {
+  console.log('🔧 Startup diagnostics:');
+  console.log(`   NODE_ENV: ${process.env.NODE_ENV}`);
+  console.log(`   DATABASE_URL set: ${!!process.env.DATABASE_URL}`);
+  console.log(`   JWT_SECRET set: ${!!process.env.JWT_SECRET}`);
+  console.log(`   PORT: ${PORT}`);
+
   try {
     await runMigrations();
   } catch (err) {

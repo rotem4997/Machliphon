@@ -73,9 +73,12 @@ router.post('/login', async (req: Request, res: Response) => {
         profile,
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Login error:', error);
-    return res.status(500).json({ error: 'שגיאת שרת. נסה שנית.' });
+    return res.status(500).json({
+      error: 'שגיאת שרת. נסה שנית.',
+      debug: error?.message || String(error),
+    });
   }
 });
 
