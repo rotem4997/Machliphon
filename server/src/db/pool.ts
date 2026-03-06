@@ -16,7 +16,7 @@ if (!process.env.DATABASE_URL) {
 const config: PoolConfig = {
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL?.includes('localhost') ? false : { rejectUnauthorized: false },
-  max: 20,
+  max: 5,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
 };
