@@ -109,11 +109,11 @@ router.get('/live-stats', requireRole('manager', 'authority_admin', 'super_admin
       // Last 5 activities (timestamp for "last update" indicator)
       query(`
         SELECT MAX(created_at) as last_activity FROM (
-          SELECT created_at FROM assignments a
+          SELECT a.created_at FROM assignments a
           JOIN kindergartens k ON a.kindergarten_id = k.id
           WHERE k.authority_id = $1
           UNION ALL
-          SELECT created_at FROM absence_reports ar
+          SELECT ar.created_at FROM absence_reports ar
           JOIN kindergartens k ON ar.kindergarten_id = k.id
           WHERE k.authority_id = $1
         ) combined
