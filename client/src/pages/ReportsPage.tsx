@@ -51,8 +51,8 @@ export default function ReportsPage() {
   const totalAssignments = assignments?.length ?? 0;
   const completed = assignments?.filter(a => a.status === 'completed') ?? [];
   const cancelled = assignments?.filter(a => a.status === 'cancelled') ?? [];
-  const totalHours = completed.reduce((sum, a) => sum + (a.hours_worked ?? 0), 0);
-  const totalPay = completed.reduce((sum, a) => sum + (a.total_pay ?? 0), 0);
+  const totalHours = completed.reduce((sum, a) => sum + (Number(a.hours_worked) || 0), 0);
+  const totalPay = completed.reduce((sum, a) => sum + (Number(a.total_pay) || 0), 0);
 
   // Status distribution for pie chart
   const statusCounts = assignments?.reduce((acc, a) => {

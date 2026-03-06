@@ -65,7 +65,11 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
       todayTotal: parseInt(assignments.rows[0].total || '0'),
       openAbsences: parseInt(absences.rows[0].count),
       expiringPermits: parseInt(permits.rows[0].count),
-      weekCoverage: weekCoverage.rows,
+      weekCoverage: weekCoverage.rows.map(r => ({
+        date: r.date,
+        assignments: parseInt(r.assignments) || 0,
+        open_absences: parseInt(r.open_absences) || 0,
+      })),
     });
   } catch (error) {
     console.error('Dashboard stats error:', error);
@@ -102,7 +106,14 @@ router.get('/coverage-by-neighborhood', async (req: AuthRequest, res: Response) 
       ORDER BY coverage_pct DESC NULLS LAST
     `, [authorityId, month || null, year || null]);
 
-    return res.json(result.rows);
+    return res.json(result.rows.map(r => ({
+      ...r,
+      kindergartens_count: parseInt(r.kindergartens_count) || 0,
+      total_assignments: parseInt(r.total_assignments) || 0,
+      completed: parseInt(r.completed) || 0,
+      uncovered_absences: parseInt(r.uncovered_absences) || 0,
+      coverage_pct: parseFloat(r.coverage_pct) || 0,
+    })));
   } catch (error) {
     return res.status(500).json({ error: 'שגיאת שרת.' });
   }

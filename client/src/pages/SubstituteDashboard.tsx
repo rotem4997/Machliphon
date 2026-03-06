@@ -213,7 +213,7 @@ export default function SubstituteDashboard() {
             <p className="text-xs text-slate-500 mt-0.5">שיבוצים סה"כ</p>
           </div>
           <div className="card p-4 text-center">
-            <p className="text-2xl font-black text-mint-500">{profile.rating?.toFixed(1) || '—'}</p>
+            <p className="text-2xl font-black text-mint-500">{Number(profile.rating) ? Number(profile.rating).toFixed(1) : '—'}</p>
             <p className="text-xs text-slate-500 mt-0.5">דירוג</p>
           </div>
           <div className="card p-4 text-center">
