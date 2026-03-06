@@ -5,7 +5,7 @@
     "buildCommand": "NODE_ENV=development npm install && npm run build"
   },
   "deploy": {
-    "startCommand": "npm run db:migrate --workspace=server && npm run start --workspace=server",
+    "startCommand": "node server/dist/db/migrate.js && npm run start --workspace=server",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 5
   }
