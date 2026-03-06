@@ -238,9 +238,20 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+DROP TRIGGER IF EXISTS update_authorities_updated_at ON authorities;
 CREATE TRIGGER update_authorities_updated_at BEFORE UPDATE ON authorities FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_kindergartens_updated_at ON kindergartens;
 CREATE TRIGGER update_kindergartens_updated_at BEFORE UPDATE ON kindergartens FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_substitutes_updated_at ON substitutes;
 CREATE TRIGGER update_substitutes_updated_at BEFORE UPDATE ON substitutes FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_assignments_updated_at ON assignments;
 CREATE TRIGGER update_assignments_updated_at BEFORE UPDATE ON assignments FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_absence_reports_updated_at ON absence_reports;
 CREATE TRIGGER update_absence_reports_updated_at BEFORE UPDATE ON absence_reports FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();

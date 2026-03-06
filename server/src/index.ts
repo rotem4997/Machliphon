@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
+import path from 'path';
 
 import authRoutes from './routes/auth';
 import substitutesRoutes from './routes/substitutes';
@@ -65,10 +66,19 @@ app.use('/api/kindergartens', kindergartensRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/activity', activityRoutes);
 
-// ── 404 handler ──────────────────────────────────────────────
-app.use((req, res) => {
-  res.status(404).json({ error: `Route ${req.method} ${req.path} not found` });
-});
+// ── Serve frontend in production ─────────────────────────────
+if (process.env.NODE_ENV === 'production') {
+  const clientDist = path.resolve(__dirname, '../../client/dist');
+  app.use(express.static(clientDist));
+  app.get('*', (_, res) => {
+    res.sendFile(path.join(clientDist, 'index.html'));
+  });
+} else {
+  // ── 404 handler (dev only — frontend served by Vite) ────────
+  app.use((req, res) => {
+    res.status(404).json({ error: `Route ${req.method} ${req.path} not found` });
+  });
+}
 
 // ── Error handler ────────────────────────────────────────────
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
