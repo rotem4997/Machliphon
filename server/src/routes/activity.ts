@@ -13,7 +13,7 @@ router.get('/feed', requireRole('manager', 'authority_admin', 'super_admin'), as
 
     // Combine recent assignments, absences, and notifications into unified feed
     const result = await query(`
-      (
+      SELECT * FROM (
         SELECT
           'assignment' as event_type,
           a.id,
@@ -33,9 +33,9 @@ router.get('/feed', requireRole('manager', 'authority_admin', 'super_admin'), as
         WHERE k.authority_id = $1
         ORDER BY a.created_at DESC
         LIMIT $2
-      )
+      ) assignments_feed
       UNION ALL
-      (
+      SELECT * FROM (
         SELECT
           'absence' as event_type,
           ar.id,
@@ -52,7 +52,7 @@ router.get('/feed', requireRole('manager', 'authority_admin', 'super_admin'), as
         WHERE k.authority_id = $1
         ORDER BY ar.created_at DESC
         LIMIT $2
-      )
+      ) absences_feed
       ORDER BY event_time DESC
       LIMIT $2
     `, [authorityId, limit]);

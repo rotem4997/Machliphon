@@ -80,21 +80,21 @@ router.get('/coverage-by-neighborhood', async (req: AuthRequest, res: Response) 
     const { month, year } = req.query;
 
     const result = await query(`
-      SELECT 
+      SELECT
         k.neighborhood,
         COUNT(DISTINCT k.id) as kindergartens_count,
-        COUNT(a.id) FILTER (WHERE a.status NOT IN ('cancelled')) as total_assignments,
-        COUNT(a.id) FILTER (WHERE a.status = 'completed') as completed,
-        COUNT(ar.id) FILTER (WHERE ar.status = 'uncovered') as uncovered_absences,
+        COUNT(DISTINCT a.id) FILTER (WHERE a.status NOT IN ('cancelled')) as total_assignments,
+        COUNT(DISTINCT a.id) FILTER (WHERE a.status = 'completed') as completed,
+        COUNT(DISTINCT ar.id) FILTER (WHERE ar.status = 'uncovered') as uncovered_absences,
         ROUND(
-          COUNT(a.id) FILTER (WHERE a.status = 'completed')::numeric / 
-          NULLIF(COUNT(ar.id), 0) * 100
+          COUNT(DISTINCT a.id) FILTER (WHERE a.status = 'completed')::numeric /
+          NULLIF(COUNT(DISTINCT ar.id), 0) * 100
         , 1) as coverage_pct
       FROM kindergartens k
       LEFT JOIN absence_reports ar ON ar.kindergarten_id = k.id
         AND ($2::int IS NULL OR EXTRACT(MONTH FROM ar.absence_date) = $2)
         AND ($3::int IS NULL OR EXTRACT(YEAR FROM ar.absence_date) = $3)
-      LEFT JOIN assignments a ON a.kindergarten_id = k.id
+      LEFT JOIN assignments a ON a.absence_id = ar.id
         AND ($2::int IS NULL OR EXTRACT(MONTH FROM a.assignment_date) = $2)
         AND ($3::int IS NULL OR EXTRACT(YEAR FROM a.assignment_date) = $3)
       WHERE k.authority_id = $1

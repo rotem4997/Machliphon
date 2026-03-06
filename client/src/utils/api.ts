@@ -30,9 +30,12 @@ api.interceptors.response.use(
       try {
         const stored = localStorage.getItem('machliphon-auth');
         if (stored) {
-          const { state } = JSON.parse(stored);
-          if (state?.refreshToken) {
-            const { data } = await axios.post('/api/auth/refresh', { refreshToken: state.refreshToken });
+          const parsed = JSON.parse(stored);
+          if (parsed.state?.refreshToken) {
+            const { data } = await axios.post('/api/auth/refresh', { refreshToken: parsed.state.refreshToken });
+            // Update token in persisted store so subsequent requests use it
+            parsed.state.token = data.token;
+            localStorage.setItem('machliphon-auth', JSON.stringify(parsed));
             originalRequest.headers.Authorization = `Bearer ${data.token}`;
             return api(originalRequest);
           }

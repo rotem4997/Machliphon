@@ -20,22 +20,28 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// ── Validate required env vars ───────────────────────────────
+if (!process.env.JWT_SECRET) {
+  console.warn('⚠️  JWT_SECRET not set, generating a random one (NOT suitable for production)');
+  process.env.JWT_SECRET = require('crypto').randomBytes(32).toString('hex');
+}
+
 // ── Security middleware ──────────────────────────────────────
-app.use(helmet());
+app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: process.env.CLIENT_URL || true,
   credentials: true,
 }));
 
 // ── Rate limiting ────────────────────────────────────────────
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 min
-  max: 100,
+  max: 500,
   message: 'יותר מדי בקשות. נסה שנית בעוד מעט.',
 });
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10, // Strict for auth
+  max: 20,
   message: 'יותר מדי ניסיונות כניסה. נסה שנית בעוד 15 דקות.',
 });
 
