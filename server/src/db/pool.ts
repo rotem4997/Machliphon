@@ -1,5 +1,9 @@
-import { Pool, PoolConfig } from 'pg';
+import pg, { Pool, PoolConfig } from 'pg';
 import dotenv from 'dotenv';
+
+// PostgreSQL returns NUMERIC/DECIMAL columns as strings by default.
+// This causes .toFixed() crashes on the frontend. Parse them globally.
+pg.types.setTypeParser(1700, (val: string) => parseFloat(val)); // OID 1700 = NUMERIC/DECIMAL
 
 dotenv.config();
 
