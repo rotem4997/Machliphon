@@ -1,4 +1,90 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
+import toast from 'react-hot-toast';
+
+/**
+ * Structured error response from the server.
+ */
+export interface ApiErrorResponse {
+  error: string;        // Hebrew user-friendly message
+  errorCode: string;    // Machine-readable code for branching
+  requestId?: string;   // Correlates with server logs
+  timestamp: string;
+  debug?: {
+    code: string;
+    source: string;
+    detail: string;
+    meta?: Record<string, unknown>;
+  };
+}
+
+/**
+ * Extract a user-friendly error message from an Axios error.
+ */
+export function getErrorMessage(err: unknown): string {
+  if (axios.isAxiosError(err)) {
+    const axErr = err as AxiosError<ApiErrorResponse>;
+    // Server returned a structured error
+    if (axErr.response?.data?.error) {
+      return axErr.response.data.error;
+    }
+    // Network / timeout
+    if (axErr.code === 'ECONNABORTED') return 'הבקשה ארכה יותר מדי זמן. נסה שנית.';
+    if (!axErr.response) return 'אין חיבור לשרת. בדוק את החיבור לאינטרנט.';
+    // HTTP status fallbacks
+    if (axErr.response.status === 429) return 'יותר מדי בקשות. נסה שנית בעוד מעט.';
+    if (axErr.response.status >= 500) return 'שגיאת שרת. אנא נסה שנית.';
+  }
+  return 'אירעה שגיאה. אנא נסה שנית.';
+}
+
+/**
+ * Get the debug info from an Axios error (for console logging).
+ */
+export function getDebugInfo(err: unknown): ApiErrorResponse['debug'] | null {
+  if (axios.isAxiosError(err)) {
+    const axErr = err as AxiosError<ApiErrorResponse>;
+    return axErr.response?.data?.debug || null;
+  }
+  return null;
+}
+
+/**
+ * Get the request ID from an error (for support tickets / log correlation).
+ */
+export function getRequestId(err: unknown): string | undefined {
+  if (axios.isAxiosError(err)) {
+    const axErr = err as AxiosError<ApiErrorResponse>;
+    return axErr.response?.data?.requestId || axErr.response?.headers?.['x-request-id'];
+  }
+  return undefined;
+}
+
+/**
+ * Show a user-friendly toast for an API error.
+ * Logs full debug info to console for agent/developer debugging.
+ */
+export function handleApiError(err: unknown, context?: string) {
+  const message = getErrorMessage(err);
+  const debug = getDebugInfo(err);
+  const requestId = getRequestId(err);
+
+  // User-friendly toast
+  toast.error(message);
+
+  // Structured console log for debugging / agent fixing
+  console.error(
+    `[API_ERROR]${context ? ` [${context}]` : ''}`,
+    JSON.stringify({
+      userMessage: message,
+      requestId,
+      errorCode: axios.isAxiosError(err) ? (err as AxiosError<ApiErrorResponse>).response?.data?.errorCode : undefined,
+      status: axios.isAxiosError(err) ? (err as AxiosError<ApiErrorResponse>).response?.status : undefined,
+      debug,
+      url: axios.isAxiosError(err) ? err.config?.url : undefined,
+      method: axios.isAxiosError(err) ? err.config?.method : undefined,
+    }, null, 2)
+  );
+}
 
 const api = axios.create({
   baseURL: '/api',
@@ -33,7 +119,6 @@ api.interceptors.response.use(
           const parsed = JSON.parse(stored);
           if (parsed.state?.refreshToken) {
             const { data } = await axios.post('/api/auth/refresh', { refreshToken: parsed.state.refreshToken });
-            // Update token in persisted store so subsequent requests use it
             parsed.state.token = data.token;
             localStorage.setItem('machliphon-auth', JSON.stringify(parsed));
             originalRequest.headers.Authorization = `Bearer ${data.token}`;
@@ -41,7 +126,6 @@ api.interceptors.response.use(
           }
         }
       } catch {}
-      // Redirect to login
       localStorage.removeItem('machliphon-auth');
       window.location.href = '/login';
     }

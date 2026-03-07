@@ -34,3 +34,4 @@ Frontend: http://localhost:3000 | Backend: http://localhost:3001/health
 - **Vercel** (frontend): `cd client && vercel`
 
 See full docs in each folder.
+# Test change Sat Mar  7 11:19:44 UTC 2026
