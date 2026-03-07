@@ -405,7 +405,7 @@ export default function SubstituteDashboard() {
                 </button>
                 <span className="font-semibold text-sm text-navy-900">
                   {viewMode === 'week'
-                    ? `${format(weekDays[0], 'd/M')} — ${format(weekDays[6], 'd/M')}`
+                    ? `${format(weekDays[0], 'd/M')} — ${format(weekDays[weekDays.length - 1], 'd/M')}`
                     : format(currentDate, 'MMMM yyyy', { locale: he })
                   }
                 </span>
