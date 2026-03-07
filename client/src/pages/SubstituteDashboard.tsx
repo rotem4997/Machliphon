@@ -154,6 +154,7 @@ export default function SubstituteDashboard() {
   // ─── State ────────────────────────────────────────────────
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [currentDate, setCurrentDate] = useState(today);
+  const [selectedDay, setSelectedDay] = useState<Date>(today);
   const [editingProfile, setEditingProfile] = useState(false);
   const [unavailableDates, setUnavailableDates] = useState<string[]>(MOCK_UNAVAILABLE_DATES);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -183,8 +184,9 @@ export default function SubstituteDashboard() {
 
   // Use real data if available, else mock
   const p = profile || MOCK_PROFILE;
-  const todayAsgn = todayAssignment ?? MOCK_ASSIGNMENTS.find(a => a.assignment_date === todayStr) ?? null;
   const allAssignments = MOCK_ASSIGNMENTS; // always show mock for demo
+  const selectedDayStr = format(selectedDay, 'yyyy-MM-dd');
+  const selectedDayAsgn = todayAssignment ?? allAssignments.find(a => a.assignment_date === selectedDayStr) ?? null;
 
   const confirmAssignment = useMutation({
     mutationFn: (id: string) => api.patch(`/assignments/${id}/confirm`),
@@ -212,13 +214,23 @@ export default function SubstituteDashboard() {
 
   // ─── Availability toggle ──────────────────────────────────
   const toggleAvailability = (dateStr: string) => {
+    // Block if assigned to a kindergarten
+    const assignment = allAssignments.find(a => a.assignment_date === dateStr);
+    if (assignment) return;
+
+    const isCurrentlyUnavailable = unavailableDates.includes(dateStr);
+    const confirmMsg = isCurrentlyUnavailable
+      ? 'האם את בטוחה שברצונך לסמן את עצמך כזמינה?'
+      : 'האם את בטוחה שברצונך לסמן את עצמך כלא זמינה?';
+
+    if (!window.confirm(confirmMsg)) return;
+
     setUnavailableDates(prev =>
-      prev.includes(dateStr)
+      isCurrentlyUnavailable
         ? prev.filter(d => d !== dateStr)
         : [...prev, dateStr]
     );
-    const isNowAvailable = unavailableDates.includes(dateStr);
-    toast.success(isNowAvailable ? 'סומנת כזמינה' : 'סומנת כלא זמינה');
+    toast.success(isCurrentlyUnavailable ? 'סומנת כזמינה' : 'סומנת כלא זמינה');
   };
 
   const getDateStatus = (dateStr: string) => {
@@ -253,15 +265,19 @@ export default function SubstituteDashboard() {
 
   // ─── Week days for calendar ───────────────────────────────
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+    .filter(day => day.getDay() !== 6); // Exclude Saturday
 
-  // Month days
-  const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-  const monthDayOfWeek = monthStart.getDay();
+  // Month days (6-column grid: Sun-Fri, no Saturday)
+  const monthStartDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
   const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+  const allMonthDates = Array.from({ length: daysInMonth }, (_, i) => new Date(currentDate.getFullYear(), currentDate.getMonth(), i + 1))
+    .filter(d => d.getDay() !== 6); // Exclude Saturdays
+  // Padding for first row: map day-of-week to 6-col index (Sun=0..Fri=5)
+  const firstDayCol = allMonthDates.length > 0 ? allMonthDates[0].getDay() : 0;
   const monthDays: (Date | null)[] = [
-    ...Array.from({ length: monthDayOfWeek }, () => null),
-    ...Array.from({ length: daysInMonth }, (_, i) => new Date(currentDate.getFullYear(), currentDate.getMonth(), i + 1)),
+    ...Array.from({ length: firstDayCol }, () => null),
+    ...allMonthDates,
   ];
 
   // ─── Render ───────────────────────────────────────────────
@@ -292,32 +308,34 @@ export default function SubstituteDashboard() {
           )}
 
           {/* Today's assignment */}
-          {todayAsgn ? (
+          {selectedDayAsgn ? (
             <div className="card p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Calendar size={18} className="text-mint-500" />
-                <h2 className="font-bold text-navy-900">שיבוץ להיום</h2>
+                <h2 className="font-bold text-navy-900">
+                  {isSameDay(selectedDay, today) ? 'שיבוץ להיום' : `שיבוץ ל${format(selectedDay, 'EEEE d/M', { locale: he })}`}
+                </h2>
               </div>
 
               <div className="bg-navy-900 rounded-xl p-5 text-white mb-4">
                 <p className="text-mint-400 text-sm font-medium mb-1">גן ילדים</p>
-                <p className="text-lg font-bold">{todayAsgn.kindergarten_name}</p>
+                <p className="text-lg font-bold">{selectedDayAsgn.kindergarten_name}</p>
                 <div className="flex items-center gap-4 mt-3 text-navy-300 text-sm">
                   <div className="flex items-center gap-1.5">
                     <MapPin size={14} />
-                    {todayAsgn.kindergarten_address}
+                    {selectedDayAsgn.kindergarten_address}
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Clock size={14} />
-                    {todayAsgn.start_time} — {todayAsgn.end_time}
+                    {selectedDayAsgn.start_time} — {selectedDayAsgn.end_time}
                   </div>
                 </div>
               </div>
 
-              {todayAsgn.status === 'pending' && (
+              {selectedDayAsgn.status === 'pending' && (
                 <div className="grid grid-cols-2 gap-3">
                   <button
-                    onClick={() => confirmAssignment.mutate(todayAsgn.id)}
+                    onClick={() => confirmAssignment.mutate(selectedDayAsgn.id)}
                     disabled={confirmAssignment.isPending}
                     className="btn-primary flex items-center justify-center gap-2 py-4 text-base"
                   >
@@ -334,21 +352,10 @@ export default function SubstituteDashboard() {
                 </div>
               )}
 
-              {todayAsgn.status === 'confirmed' && (
-                <button
-                  onClick={() => markArrived.mutate(todayAsgn.id)}
-                  disabled={markArrived.isPending}
-                  className="btn-primary w-full flex items-center justify-center gap-2 py-4 text-base"
-                >
-                  <CheckCircle size={20} />
-                  הגעתי לגן ✓
-                </button>
-              )}
-
-              {todayAsgn.status === 'arrived' && (
+              {selectedDayAsgn.status === 'confirmed' && (
                 <div className="bg-mint-100 rounded-xl p-4 text-center">
                   <CheckCircle size={24} className="text-mint-500 mx-auto mb-2" />
-                  <p className="text-mint-700 font-semibold">הגעתך אושרה. עבודה טובה!</p>
+                  <p className="text-mint-700 font-semibold">השיבוץ אושר</p>
                 </div>
               )}
             </div>
@@ -357,7 +364,9 @@ export default function SubstituteDashboard() {
               <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
                 <Calendar size={28} className="text-slate-400" />
               </div>
-              <p className="font-semibold text-navy-900">אין שיבוץ להיום</p>
+              <p className="font-semibold text-navy-900">
+                {isSameDay(selectedDay, today) ? 'אין שיבוץ להיום' : `אין שיבוץ ל${format(selectedDay, 'EEEE d/M', { locale: he })}`}
+              </p>
               <p className="text-slate-500 text-sm mt-1">נעדכן אותך כשיהיה שיבוץ זמין</p>
             </div>
           )}
@@ -408,9 +417,9 @@ export default function SubstituteDashboard() {
 
             {/* ─── WEEK VIEW ─── */}
             {viewMode === 'week' && (
-              <div className="grid grid-cols-7 gap-1.5">
-                {/* Day headers */}
-                {['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'].map(d => (
+              <div className="grid grid-cols-6 gap-1.5">
+                {/* Day headers (Sun-Fri, no Saturday) */}
+                {['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳'].map(d => (
                   <div key={d} className="text-center text-xs font-medium text-slate-400 pb-1">{d}</div>
                 ))}
                 {/* Day cells */}
@@ -418,13 +427,16 @@ export default function SubstituteDashboard() {
                   const dateStr = format(day, 'yyyy-MM-dd');
                   const status = getDateStatus(dateStr);
                   const isToday = isSameDay(day, today);
+                  const isSelected = isSameDay(day, selectedDay);
                   const assignment = allAssignments.find(a => a.assignment_date === dateStr);
 
                   return (
                     <button
                       key={dateStr}
-                      onClick={() => toggleAvailability(dateStr)}
+                      onClick={() => setSelectedDay(day)}
                       className={`relative rounded-xl p-2 text-center transition-all min-h-[80px] flex flex-col items-center justify-start gap-1 border-2 ${
+                        isSelected ? 'ring-2 ring-blue-400 ring-offset-1' : ''
+                      } ${
                         isToday ? 'ring-2 ring-mint-400 ring-offset-1' : ''
                       } ${
                         status === 'assigned'
@@ -454,8 +466,8 @@ export default function SubstituteDashboard() {
 
             {/* ─── MONTH VIEW ─── */}
             {viewMode === 'month' && (
-              <div className="grid grid-cols-7 gap-1">
-                {['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'].map(d => (
+              <div className="grid grid-cols-6 gap-1">
+                {['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳'].map(d => (
                   <div key={d} className="text-center text-xs font-medium text-slate-400 pb-1">{d}</div>
                 ))}
                 {monthDays.map((day, i) => {
@@ -463,12 +475,15 @@ export default function SubstituteDashboard() {
                   const dateStr = format(day, 'yyyy-MM-dd');
                   const status = getDateStatus(dateStr);
                   const isToday = isSameDay(day, today);
+                  const isSelected = isSameDay(day, selectedDay);
 
                   return (
                     <button
                       key={dateStr}
-                      onClick={() => toggleAvailability(dateStr)}
+                      onClick={() => setSelectedDay(day)}
                       className={`rounded-lg p-1.5 text-center text-xs transition-all ${
+                        isSelected ? 'ring-2 ring-blue-400 ring-offset-1' : ''
+                      } ${
                         isToday ? 'ring-2 ring-mint-400 ring-offset-1' : ''
                       } ${
                         status === 'assigned'
@@ -487,14 +502,29 @@ export default function SubstituteDashboard() {
               </div>
             )}
 
-            {/* ─── LIST VIEW ─── */}
+            {/* ─── LIST VIEW (Monthly) ─── */}
             {viewMode === 'list' && (
               <div className="space-y-2">
-                {/* Next 14 days */}
-                {Array.from({ length: 14 }, (_, i) => addDays(today, i)).map(day => {
-                  const dateStr = format(day, 'yyyy-MM-dd');
-                  const status = getDateStatus(dateStr);
-                  const assignment = allAssignments.find(a => a.assignment_date === dateStr);
+                {/* Navigation for list view */}
+                <div className="flex items-center justify-between mb-3">
+                  <button onClick={() => setCurrentDate(prev => addMonths(prev, 1))} className="p-1.5 hover:bg-slate-100 rounded-lg">
+                    <ChevronRight size={18} />
+                  </button>
+                  <span className="font-semibold text-sm text-navy-900">
+                    {format(currentDate, 'MMMM yyyy', { locale: he })}
+                  </span>
+                  <button onClick={() => setCurrentDate(prev => subMonths(prev, 1))} className="p-1.5 hover:bg-slate-100 rounded-lg">
+                    <ChevronLeft size={18} />
+                  </button>
+                </div>
+
+                {/* Monthly assignments list */}
+                {allAssignments
+                  .filter(a => isSameMonth(parseISO(a.assignment_date), currentDate))
+                  .sort((a, b) => a.assignment_date.localeCompare(b.assignment_date))
+                  .map(assignment => {
+                  const day = parseISO(assignment.assignment_date);
+                  const dateStr = assignment.assignment_date;
                   const isToday = isSameDay(day, today);
 
                   return (
@@ -505,65 +535,39 @@ export default function SubstituteDashboard() {
                       }`}
                     >
                       {/* Date badge */}
-                      <div className={`text-center rounded-lg px-2.5 py-1.5 min-w-[48px] ${
-                        status === 'assigned' ? 'bg-navy-900' :
-                        status === 'unavailable' ? 'bg-red-100' : 'bg-slate-200'
-                      }`}>
-                        <p className={`text-xs font-bold ${
-                          status === 'assigned' ? 'text-mint-400' :
-                          status === 'unavailable' ? 'text-red-500' : 'text-slate-600'
-                        }`}>
+                      <div className="text-center rounded-lg px-2.5 py-1.5 min-w-[48px] bg-navy-900">
+                        <p className="text-xs font-bold text-mint-400">
                           {format(day, 'EEE', { locale: he })}
                         </p>
-                        <p className={`text-sm font-bold ${
-                          status === 'assigned' ? 'text-white' :
-                          status === 'unavailable' ? 'text-red-600' : 'text-navy-900'
-                        }`}>
+                        <p className="text-sm font-bold text-white">
                           {format(day, 'd/M')}
                         </p>
                       </div>
 
                       {/* Details */}
                       <div className="flex-1 min-w-0">
-                        {assignment ? (
-                          <>
-                            <p className="text-sm font-semibold text-navy-900">{assignment.kindergarten_name}</p>
-                            <p className="text-xs text-slate-500">{assignment.kindergarten_address} · {assignment.start_time}—{assignment.end_time}</p>
-                          </>
-                        ) : status === 'unavailable' ? (
-                          <p className="text-sm text-red-500 font-medium">לא זמינה</p>
-                        ) : (
-                          <p className="text-sm text-mint-600 font-medium">זמינה</p>
-                        )}
+                        <p className="text-sm font-semibold text-navy-900">{assignment.kindergarten_name}</p>
+                        <p className="text-xs text-slate-500">{assignment.kindergarten_address} · {assignment.start_time}—{assignment.end_time}</p>
                       </div>
 
-                      {/* Status indicator + toggle */}
+                      {/* Status indicator */}
                       <div className="flex items-center gap-2">
-                        {assignment && (
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                            assignment.status === 'confirmed' ? 'badge-green' :
-                            assignment.status === 'arrived' ? 'badge-blue' : 'badge-amber'
-                          }`}>
-                            {assignment.status === 'confirmed' ? 'מאושר' :
-                             assignment.status === 'arrived' ? 'הגיעה' : 'ממתין'}
-                          </span>
-                        )}
-                        {!assignment && (
-                          <button
-                            onClick={() => toggleAvailability(dateStr)}
-                            className={`p-1.5 rounded-lg transition-all ${
-                              status === 'unavailable'
-                                ? 'bg-red-100 text-red-500 hover:bg-red-200'
-                                : 'bg-mint-100 text-mint-500 hover:bg-mint-200'
-                            }`}
-                          >
-                            {status === 'unavailable' ? <XCircle size={16} /> : <CheckCircle size={16} />}
-                          </button>
-                        )}
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          assignment.status === 'confirmed' ? 'badge-green' :
+                          assignment.status === 'completed' ? 'badge-blue' : 'badge-amber'
+                        }`}>
+                          {assignment.status === 'confirmed' ? 'מאושר' :
+                           assignment.status === 'completed' ? 'הושלם' : 'ממתין'}
+                        </span>
                       </div>
                     </div>
                   );
                 })}
+                {allAssignments.filter(a => isSameMonth(parseISO(a.assignment_date), currentDate)).length === 0 && (
+                  <div className="text-center py-8 text-slate-400 text-sm">
+                    אין שיבוצים לחודש זה
+                  </div>
+                )}
               </div>
             )}
 
@@ -585,10 +589,13 @@ export default function SubstituteDashboard() {
           </div>
 
           {/* Stats (without rating and experience) */}
-          <div className="card p-4 text-center">
+          <button
+            onClick={() => { setViewMode('list'); }}
+            className="card p-4 text-center w-full hover:bg-slate-50 transition-all cursor-pointer"
+          >
             <p className="text-2xl font-black text-navy-900">{p.total_assignments || 24}</p>
             <p className="text-xs text-slate-500 mt-0.5">שיבוצים סה"כ</p>
-          </div>
+          </button>
         </div>
 
         {/* ═══ RIGHT COLUMN: Profile + Availability sidebar ═══ */}

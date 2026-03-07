@@ -26,8 +26,6 @@ const navItems: Record<UserRole, { href: string; label: string; icon: React.Reac
   ],
   substitute: [
     { href: '/dashboard', label: 'שיבוצים שלי', icon: <Calendar size={18} /> },
-    { href: '/profile', label: 'הפרופיל שלי', icon: <Users size={18} /> },
-    { href: '/availability', label: 'זמינות', icon: <ClipboardList size={18} /> },
   ],
   super_admin: [
     { href: '/dashboard', label: 'לוח בקרה', icon: <LayoutDashboard size={18} /> },
