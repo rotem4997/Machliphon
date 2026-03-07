@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Filter, Plus, CheckCircle, XCircle, Clock, Phone } from 'lucide-react';
-import api from '@/utils/api';
+import api, { handleApiError } from '@/utils/api';
 import toast from 'react-hot-toast';
 
 interface Substitute {
@@ -14,9 +14,7 @@ interface Substitute {
   work_permit_valid: boolean;
   work_permit_expiry: string;
   education_level: string;
-  years_experience: number;
   status: string;
-  rating: number;
   total_assignments: number;
   has_assignment_today: boolean;
   assignments_this_month: number;
@@ -131,7 +129,7 @@ export default function SubstitutesPage() {
                           </div>
                           <div>
                             <p className="font-semibold text-navy-900 text-sm">{sub.first_name} {sub.last_name}</p>
-                            <p className="text-slate-400 text-xs">{sub.education_level} • {sub.years_experience} שנות ניסיון</p>
+                            <p className="text-slate-400 text-xs">{sub.education_level}</p>
                           </div>
                           {sub.has_assignment_today && (
                             <span className="badge-blue hidden sm:flex">משובצת היום</span>

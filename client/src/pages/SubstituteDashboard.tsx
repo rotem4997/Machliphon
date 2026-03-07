@@ -4,7 +4,7 @@ import {
   CheckCircle, XCircle, Calendar, MapPin, Clock, AlertCircle,
   ChevronRight, ChevronLeft, Camera, Edit3, List, LayoutGrid, Save, X,
 } from 'lucide-react';
-import api from '@/utils/api';
+import api, { handleApiError } from '@/utils/api';
 import toast from 'react-hot-toast';
 import { format, parseISO, startOfWeek, addDays, addWeeks, addMonths, subWeeks, subMonths, isSameDay, isSameMonth } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -72,6 +72,56 @@ const MOCK_ASSIGNMENTS: Assignment[] = [
     neighborhood: 'מרכז',
     status: 'pending',
   },
+  {
+    id: 'mock-6',
+    assignment_date: format(addDays(new Date(), 14), 'yyyy-MM-dd'),
+    start_time: '07:30',
+    end_time: '14:00',
+    kindergarten_name: 'גן דליה',
+    kindergarten_address: 'רחוב ז׳בוטינסקי 11',
+    neighborhood: 'מזרח',
+    status: 'pending',
+  },
+  {
+    id: 'mock-7',
+    assignment_date: format(addDays(new Date(), 17), 'yyyy-MM-dd'),
+    start_time: '08:00',
+    end_time: '13:00',
+    kindergarten_name: 'גן שושנה',
+    kindergarten_address: 'רחוב הגפן 5',
+    neighborhood: 'צפון',
+    status: 'pending',
+  },
+  {
+    id: 'mock-8',
+    assignment_date: format(addDays(new Date(), 21), 'yyyy-MM-dd'),
+    start_time: '07:30',
+    end_time: '14:00',
+    kindergarten_name: 'גן יסמין',
+    kindergarten_address: 'רחוב העצמאות 19',
+    neighborhood: 'דרום',
+    status: 'pending',
+  },
+  {
+    id: 'mock-past-1',
+    assignment_date: format(addDays(new Date(), -2), 'yyyy-MM-dd'),
+    start_time: '07:30',
+    end_time: '14:00',
+    kindergarten_name: 'גן חבצלת',
+    kindergarten_address: 'רחוב הרצל 15',
+    neighborhood: 'מרכז',
+    status: 'completed',
+  },
+  {
+    id: 'mock-past-2',
+    assignment_date: format(addDays(new Date(), -5), 'yyyy-MM-dd'),
+    start_time: '08:00',
+    end_time: '13:30',
+    kindergarten_name: 'גן נרקיס',
+    kindergarten_address: 'רחוב ויצמן 8',
+    neighborhood: 'צפון',
+    status: 'completed',
+  },
 ];
 
 // Mock availability: dates the substitute marked as unavailable
@@ -79,6 +129,8 @@ const MOCK_UNAVAILABLE_DATES = [
   format(addDays(new Date(), 2), 'yyyy-MM-dd'),
   format(addDays(new Date(), 5), 'yyyy-MM-dd'),
   format(addDays(new Date(), 8), 'yyyy-MM-dd'),
+  format(addDays(new Date(), 12), 'yyyy-MM-dd'),
+  format(addDays(new Date(), 19), 'yyyy-MM-dd'),
 ];
 
 const MOCK_PROFILE = {
@@ -140,16 +192,16 @@ export default function SubstituteDashboard() {
       toast.success('✅ אישרת את השיבוץ!');
       queryClient.invalidateQueries({ queryKey: ['today-assignment'] });
     },
-    onError: () => toast.success('✅ אישרת את השיבוץ! (הדגמה)'),
+    onError: (err) => handleApiError(err, 'confirmAssignment'),
   });
 
   const markArrived = useMutation({
     mutationFn: (id: string) => api.patch(`/assignments/${id}/arrive`),
     onSuccess: () => {
-      toast.success('👋 הגעתך אושרה!');
+      toast.success('הגעתך אושרה!');
       queryClient.invalidateQueries({ queryKey: ['today-assignment'] });
     },
-    onError: () => toast.success('👋 הגעתך אושרה! (הדגמה)'),
+    onError: (err) => handleApiError(err, 'markArrived'),
   });
 
   const permitOk = p?.work_permit_valid &&

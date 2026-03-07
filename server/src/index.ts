@@ -14,6 +14,8 @@ import absencesRoutes from './routes/absences';
 import kindergartensRoutes from './routes/kindergartens';
 import notificationsRoutes from './routes/notifications';
 import activityRoutes from './routes/activity';
+import { requestIdMiddleware } from './middleware/requestId';
+import { errorHandler } from './middleware/errorHandler';
 
 dotenv.config();
 
@@ -25,6 +27,9 @@ if (!process.env.JWT_SECRET) {
   console.warn('⚠️  JWT_SECRET not set, generating a random one (NOT suitable for production)');
   process.env.JWT_SECRET = require('crypto').randomBytes(32).toString('hex');
 }
+
+// ── Request tracking ─────────────────────────────────────────
+app.use(requestIdMiddleware);
 
 // ── Security middleware ──────────────────────────────────────
 app.use(helmet({ contentSecurityPolicy: false }));
@@ -102,13 +107,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // ── Error handler ────────────────────────────────────────────
-app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error('Unhandled error:', err);
-  res.status(500).json({
-    error: 'שגיאת שרת.',
-    debug: err.message,
-  });
-});
+app.use(errorHandler);
 
 // ── Start ─────────────────────────────────────────────────────
 import { runMigrations } from './db/migrate';
