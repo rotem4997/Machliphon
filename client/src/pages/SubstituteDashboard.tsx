@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle, XCircle, Calendar, MapPin, Clock, AlertCircle,
@@ -240,13 +240,23 @@ export default function SubstituteDashboard() {
     return 'available';
   };
 
-  // ─── Calendar navigation ──────────────────────────────────
+  // ─── Calendar navigation (RTL: ChevronLeft = forward, ChevronRight = back) ──
   const navigateBack = () => {
     setCurrentDate(prev => viewMode === 'week' ? subWeeks(prev, 1) : subMonths(prev, 1));
   };
   const navigateForward = () => {
     setCurrentDate(prev => viewMode === 'week' ? addWeeks(prev, 1) : addMonths(prev, 1));
   };
+
+  // If today is Saturday, default selectedDay to closest Sunday (tomorrow)
+  useEffect(() => {
+    if (today.getDay() === 6) {
+      const closestSunday = addDays(today, 1);
+      setSelectedDay(closestSunday);
+      setCurrentDate(closestSunday);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ─── Photo upload handler ─────────────────────────────────
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -368,6 +378,29 @@ export default function SubstituteDashboard() {
                 {isSameDay(selectedDay, today) ? 'אין שיבוץ להיום' : `אין שיבוץ ל${format(selectedDay, 'EEEE d/M', { locale: he })}`}
               </p>
               <p className="text-slate-500 text-sm mt-1">נעדכן אותך כשיהיה שיבוץ זמין</p>
+
+              {/* Availability toggle for unassigned days */}
+              {selectedDay >= today && (
+                <div className="mt-4">
+                  {unavailableDates.includes(selectedDayStr) ? (
+                    <button
+                      onClick={() => toggleAvailability(selectedDayStr)}
+                      className="btn-primary flex items-center justify-center gap-2 py-3 w-full text-base"
+                    >
+                      <CheckCircle size={20} />
+                      סמני כזמינה
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => toggleAvailability(selectedDayStr)}
+                      className="btn-secondary flex items-center justify-center gap-2 py-3 w-full text-base text-red-500 border-red-200"
+                    >
+                      <XCircle size={20} />
+                      סמני כלא זמינה
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -400,7 +433,7 @@ export default function SubstituteDashboard() {
             {/* Navigation */}
             {viewMode !== 'list' && (
               <div className="flex items-center justify-between mb-3">
-                <button onClick={navigateForward} className="p-1.5 hover:bg-slate-100 rounded-lg">
+                <button onClick={navigateBack} className="p-1.5 hover:bg-slate-100 rounded-lg">
                   <ChevronRight size={18} />
                 </button>
                 <span className="font-semibold text-sm text-navy-900">
@@ -409,7 +442,7 @@ export default function SubstituteDashboard() {
                     : format(currentDate, 'MMMM yyyy', { locale: he })
                   }
                 </span>
-                <button onClick={navigateBack} className="p-1.5 hover:bg-slate-100 rounded-lg">
+                <button onClick={navigateForward} className="p-1.5 hover:bg-slate-100 rounded-lg">
                   <ChevronLeft size={18} />
                 </button>
               </div>
@@ -507,13 +540,13 @@ export default function SubstituteDashboard() {
               <div className="space-y-2">
                 {/* Navigation for list view */}
                 <div className="flex items-center justify-between mb-3">
-                  <button onClick={() => setCurrentDate(prev => addMonths(prev, 1))} className="p-1.5 hover:bg-slate-100 rounded-lg">
+                  <button onClick={() => setCurrentDate(prev => subMonths(prev, 1))} className="p-1.5 hover:bg-slate-100 rounded-lg">
                     <ChevronRight size={18} />
                   </button>
                   <span className="font-semibold text-sm text-navy-900">
                     {format(currentDate, 'MMMM yyyy', { locale: he })}
                   </span>
-                  <button onClick={() => setCurrentDate(prev => subMonths(prev, 1))} className="p-1.5 hover:bg-slate-100 rounded-lg">
+                  <button onClick={() => setCurrentDate(prev => addMonths(prev, 1))} className="p-1.5 hover:bg-slate-100 rounded-lg">
                     <ChevronLeft size={18} />
                   </button>
                 </div>
