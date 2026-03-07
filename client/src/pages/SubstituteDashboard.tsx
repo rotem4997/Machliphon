@@ -5,6 +5,7 @@ import {
   ChevronRight, ChevronLeft, Camera, Edit3, List, LayoutGrid, Save, X,
 } from 'lucide-react';
 import api, { handleApiError } from '@/utils/api';
+import { useAuthStore } from '@/context/authStore';
 import toast from 'react-hot-toast';
 import { format, parseISO, startOfWeek, addDays, addWeeks, addMonths, subWeeks, subMonths, isSameDay, isSameMonth } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -148,6 +149,7 @@ type ViewMode = 'week' | 'month' | 'list';
 
 export default function SubstituteDashboard() {
   const queryClient = useQueryClient();
+  const { user: authUser } = useAuthStore();
   const today = new Date();
   const todayStr = format(today, 'yyyy-MM-dd');
 
@@ -174,6 +176,27 @@ export default function SubstituteDashboard() {
     queryFn: () => api.get('/substitutes/me').then(r => r.data),
   });
 
+  // Sync profile form when real profile data or auth user loads
+  useEffect(() => {
+    if (profile) {
+      setProfileForm({
+        first_name: profile.first_name || '',
+        last_name: profile.last_name || '',
+        email: profile.email || '',
+        phone: profile.phone || '',
+        photo_url: profile.photo_url || '',
+      });
+    } else if (authUser) {
+      setProfileForm(prev => ({
+        ...prev,
+        first_name: authUser.firstName,
+        last_name: authUser.lastName,
+        email: authUser.email,
+        phone: authUser.phone || prev.phone,
+      }));
+    }
+  }, [profile, authUser]);
+
   const { data: todayAssignment } = useQuery<Assignment>({
     queryKey: ['today-assignment'],
     queryFn: async () => {
@@ -182,14 +205,35 @@ export default function SubstituteDashboard() {
     },
   });
 
-  // Use real data if available, else mock
-  const p = profile || MOCK_PROFILE;
-  const allAssignments = MOCK_ASSIGNMENTS; // always show mock for demo
+  // Use real data if available, else auth store user, else mock
+  const p = profile || (authUser ? {
+    first_name: authUser.firstName,
+    last_name: authUser.lastName,
+    email: authUser.email,
+    phone: authUser.phone || '',
+    photo_url: '',
+    work_permit_valid: true,
+    work_permit_expiry: '2027-01-01',
+    total_assignments: 0,
+  } : MOCK_PROFILE);
+  const allAssignments = MOCK_ASSIGNMENTS.map(a =>
+    mockStatusOverrides[a.id] ? { ...a, status: mockStatusOverrides[a.id] } : a
+  );
   const selectedDayStr = format(selectedDay, 'yyyy-MM-dd');
   const selectedDayAsgn = todayAssignment ?? allAssignments.find(a => a.assignment_date === selectedDayStr) ?? null;
 
+  // Track mock assignment status changes locally
+  const [mockStatusOverrides, setMockStatusOverrides] = useState<Record<string, string>>({});
+
   const confirmAssignment = useMutation({
-    mutationFn: (id: string) => api.patch(`/assignments/${id}/confirm`),
+    mutationFn: async (id: string) => {
+      // Handle mock assignments locally instead of calling the API
+      if (id.startsWith('mock-')) {
+        setMockStatusOverrides(prev => ({ ...prev, [id]: 'confirmed' }));
+        return { data: { message: 'ok' } };
+      }
+      return api.patch(`/assignments/${id}/confirm`);
+    },
     onSuccess: () => {
       toast.success('✅ אישרת את השיבוץ!');
       queryClient.invalidateQueries({ queryKey: ['today-assignment'] });
@@ -198,7 +242,13 @@ export default function SubstituteDashboard() {
   });
 
   const markArrived = useMutation({
-    mutationFn: (id: string) => api.patch(`/assignments/${id}/arrive`),
+    mutationFn: async (id: string) => {
+      if (id.startsWith('mock-')) {
+        setMockStatusOverrides(prev => ({ ...prev, [id]: 'arrived' }));
+        return { data: { message: 'ok' } };
+      }
+      return api.patch(`/assignments/${id}/arrive`);
+    },
     onSuccess: () => {
       toast.success('הגעתך אושרה!');
       queryClient.invalidateQueries({ queryKey: ['today-assignment'] });
