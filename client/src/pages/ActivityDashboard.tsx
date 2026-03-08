@@ -1,14 +1,18 @@
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Activity, Users, Calendar, AlertTriangle, CheckCircle, Clock,
-  MapPin, User, ArrowLeftRight, Zap
+  Activity, Calendar, AlertTriangle, CheckCircle, Clock,
+  User, ArrowLeftRight, Zap, MapPin,
 } from 'lucide-react';
 import api from '@/utils/api';
-import { formatDistanceToNow, parseISO, format } from 'date-fns';
+import { formatDistanceToNow, parseISO, format, addDays } from 'date-fns';
 import { he } from 'date-fns/locale';
+import { isHoliday } from '@/utils/holidays';
+
+// ─── Types ──────────────────────────────────────────────────
 
 interface ActivityEvent {
-  event_type: 'assignment' | 'absence';
+  event_type: 'assignment' | 'absence' | 'system';
   id: string;
   status: string;
   event_time: string;
@@ -29,9 +33,108 @@ interface LiveStats {
   lastActivity: string | null;
 }
 
-const REFETCH_INTERVAL = 10_000; // 10 seconds for real-time feel
+// ─── Mock data ──────────────────────────────────────────────
+
+const MOCK_KINDERGARTENS = [
+  'גן חבצלת', 'גן נרקיס', 'גן רקפת', 'גן כלנית', 'גן דליה',
+];
+
+const MOCK_SUBS = [
+  'מרים אברהם', 'רחל לוי', 'שרה כהן', 'לאה דוד',
+];
+
+function generateMockFeed(): ActivityEvent[] {
+  const events: ActivityEvent[] = [];
+  const now = new Date();
+
+  // Generate recent assignment events
+  const actions: { status: string; verb: string }[] = [
+    { status: 'pending', verb: 'שובצה' },
+    { status: 'confirmed', verb: 'אישרה' },
+    { status: 'arrived', verb: 'הגיעה' },
+    { status: 'completed', verb: 'הושלם' },
+  ];
+
+  for (let i = 0; i < 15; i++) {
+    const minutesAgo = i * 12 + Math.floor(Math.random() * 10);
+    const eventTime = new Date(now.getTime() - minutesAgo * 60_000);
+    const action = actions[i % actions.length];
+    const sub = MOCK_SUBS[i % MOCK_SUBS.length];
+    const kg = MOCK_KINDERGARTENS[i % MOCK_KINDERGARTENS.length];
+
+    events.push({
+      event_type: 'assignment',
+      id: `mock-event-${i}`,
+      status: action.status,
+      event_time: eventTime.toISOString(),
+      details: {
+        kindergarten: kg,
+        substitute: sub,
+        date: format(now, 'yyyy-MM-dd'),
+        assignedBy: 'מנהלת',
+      },
+    });
+  }
+
+  // Add some absence events
+  for (let i = 0; i < 3; i++) {
+    const minutesAgo = (i + 5) * 20;
+    const eventTime = new Date(now.getTime() - minutesAgo * 60_000);
+    events.push({
+      event_type: 'absence',
+      id: `mock-absence-${i}`,
+      status: i === 0 ? 'open' : 'assigned',
+      event_time: eventTime.toISOString(),
+      details: {
+        kindergarten: MOCK_KINDERGARTENS[(i + 2) % MOCK_KINDERGARTENS.length],
+        employee: ['דנה שמעוני', 'יעל פרידמן', 'נועה ברק'][i],
+        date: format(now, 'yyyy-MM-dd'),
+        reason: ['sick', 'vacation', 'personal'][i],
+      },
+    });
+  }
+
+  // Add system/hole events
+  const today = new Date();
+  for (let dayOff = 0; dayOff <= 2; dayOff++) {
+    const date = addDays(today, dayOff);
+    const dateStr = format(date, 'yyyy-MM-dd');
+    if (date.getDay() === 6 || isHoliday(dateStr)) continue;
+    // Check for holes (using same logic as dashboard mock)
+    const holesCount = dayOff === 0 ? 2 : dayOff === 1 ? 1 : 3;
+    if (holesCount > 0) {
+      events.push({
+        event_type: 'system',
+        id: `mock-hole-${dayOff}`,
+        status: 'holes',
+        event_time: new Date(now.getTime() - dayOff * 3600_000).toISOString(),
+        details: {
+          kindergarten: `${holesCount} גנים`,
+          date: dateStr,
+        },
+      });
+    }
+  }
+
+  return events.sort((a, b) => new Date(b.event_time).getTime() - new Date(a.event_time).getTime());
+}
+
+const MOCK_FEED = generateMockFeed();
+
+const MOCK_LIVE_STATS: LiveStats = {
+  assignmentsToday: { pending: 2, confirmed: 3, arrived: 1, completed: 1 },
+  absencesToday: { open: 1, assigned: 2 },
+  availableSubstitutes: 2,
+  lastActivity: new Date().toISOString(),
+};
+
+const REFETCH_INTERVAL = 300_000; // 5 minutes
+
+// ─── Main Component ─────────────────────────────────────────
 
 export default function ActivityDashboard() {
+  const [filter, setFilter] = useState<'all' | 'assignments' | 'absences' | 'holes'>('all');
+
   const { data: liveStats } = useQuery<LiveStats>({
     queryKey: ['live-stats'],
     queryFn: () => api.get('/activity/live-stats').then(r => r.data),
@@ -44,24 +147,31 @@ export default function ActivityDashboard() {
     refetchInterval: REFETCH_INTERVAL,
   });
 
-  const totalAssignments = liveStats
-    ? Object.values(liveStats.assignmentsToday).reduce((a, b) => a + b, 0)
-    : 0;
-  const totalAbsences = liveStats
-    ? Object.values(liveStats.absencesToday).reduce((a, b) => a + b, 0)
-    : 0;
-  const openAbsences = liveStats?.absencesToday?.open ?? 0;
-  const completedAssignments = liveStats?.assignmentsToday?.completed ?? 0;
-  const arrivedAssignments = liveStats?.assignmentsToday?.arrived ?? 0;
+  const stats = liveStats || MOCK_LIVE_STATS;
+  const allEvents = feed && feed.length > 0 ? feed : MOCK_FEED;
+
+  const filteredEvents = useMemo(() => {
+    if (filter === 'all') return allEvents;
+    if (filter === 'assignments') return allEvents.filter(e => e.event_type === 'assignment');
+    if (filter === 'absences') return allEvents.filter(e => e.event_type === 'absence');
+    if (filter === 'holes') return allEvents.filter(e => e.event_type === 'system');
+    return allEvents;
+  }, [allEvents, filter]);
+
+  const totalAssignments = Object.values(stats.assignmentsToday).reduce((a, b) => a + b, 0);
+  const totalAbsences = Object.values(stats.absencesToday).reduce((a, b) => a + b, 0);
+  const openAbsences = stats.absencesToday?.open ?? 0;
+  const completedAssignments = stats.assignmentsToday?.completed ?? 0;
+  const arrivedAssignments = stats.assignmentsToday?.arrived ?? 0;
 
   return (
-    <div className="space-y-6 fade-in">
+    <div className="space-y-6 fade-in max-w-5xl mx-auto">
       {/* Header with live indicator */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-black text-navy-900 flex items-center gap-2">
             <Activity size={24} className="text-mint-500" />
-            פעילות בזמן אמת
+            פעילות חיה
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">
             {format(new Date(), 'EEEE, d בMMMM yyyy', { locale: he })}
@@ -73,11 +183,9 @@ export default function ActivityDashboard() {
             <span className="relative inline-flex rounded-full h-3 w-3 bg-mint-500"></span>
           </span>
           <span className="text-xs text-mint-600 font-medium">LIVE</span>
-          {liveStats?.lastActivity && (
-            <span className="text-xs text-slate-400 mr-2">
-              עדכון אחרון: {formatDistanceToNow(parseISO(liveStats.lastActivity), { addSuffix: true, locale: he })}
-            </span>
-          )}
+          <span className="text-xs text-slate-400 mr-2">
+            רענון כל 5 דקות
+          </span>
         </div>
       </div>
 
@@ -92,7 +200,7 @@ export default function ActivityDashboard() {
           bg="bg-sky-50"
         />
         <LiveCard
-          label="היעדרויות היום"
+          label="היעדרויות"
           value={totalAbsences}
           sub={openAbsences > 0 ? `${openAbsences} פתוחות` : 'הכל מכוסה'}
           icon={<AlertTriangle size={20} />}
@@ -100,15 +208,15 @@ export default function ActivityDashboard() {
           bg={openAbsences > 0 ? 'bg-red-50' : 'bg-mint-50'}
         />
         <LiveCard
-          label="מחליפות זמינות"
-          value={liveStats?.availableSubstitutes ?? 0}
-          sub="פנויות לשיבוץ"
-          icon={<Users size={20} />}
+          label="מחליפות פנויות"
+          value={stats.availableSubstitutes}
+          sub="זמינות לשיבוץ"
+          icon={<User size={20} />}
           color="text-violet-500"
           bg="bg-violet-50"
         />
         <LiveCard
-          label="אחוז כיסוי"
+          label="כיסוי"
           value={totalAbsences > 0 ? `${Math.round(((totalAbsences - openAbsences) / totalAbsences) * 100)}%` : '100%'}
           sub="מהיעדרויות מכוסות"
           icon={<CheckCircle size={20} />}
@@ -117,15 +225,15 @@ export default function ActivityDashboard() {
         />
       </div>
 
-      {/* Assignment status breakdown */}
-      {liveStats && totalAssignments > 0 && (
+      {/* Status breakdown */}
+      {totalAssignments > 0 && (
         <div className="card p-5">
           <h3 className="font-bold text-navy-900 mb-3 flex items-center gap-2">
             <Zap size={16} className="text-amber-500" />
             סטטוס שיבוצים היום
           </h3>
           <div className="flex gap-2 flex-wrap">
-            {Object.entries(liveStats.assignmentsToday).map(([status, count]) => (
+            {Object.entries(stats.assignmentsToday).map(([status, count]) => (
               <StatusPill key={status} status={status} count={count} />
             ))}
           </div>
@@ -134,13 +242,35 @@ export default function ActivityDashboard() {
 
       {/* Activity Feed */}
       <div className="card p-5">
-        <h3 className="font-bold text-navy-900 mb-4 flex items-center gap-2">
-          <Clock size={16} className="text-slate-400" />
-          פעילות אחרונה
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-navy-900 flex items-center gap-2">
+            <Clock size={16} className="text-slate-400" />
+            יומן פעילות
+          </h3>
+          {/* Filter tabs */}
+          <div className="flex bg-slate-100 rounded-xl p-1 gap-0.5">
+            {([
+              { key: 'all' as const, label: 'הכל' },
+              { key: 'assignments' as const, label: 'שיבוצים' },
+              { key: 'absences' as const, label: 'היעדרויות' },
+              { key: 'holes' as const, label: 'חורים' },
+            ]).map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setFilter(key)}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                  filter === key ? 'bg-white text-navy-900 shadow-sm' : 'text-slate-500 hover:text-navy-700'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="space-y-1">
-          {feed && feed.length > 0 ? (
-            feed.map((event, i) => (
+          {filteredEvents.length > 0 ? (
+            filteredEvents.map((event, i) => (
               <ActivityRow key={`${event.id}-${i}`} event={event} />
             ))
           ) : (
@@ -151,6 +281,8 @@ export default function ActivityDashboard() {
     </div>
   );
 }
+
+// ─── Sub-components ─────────────────────────────────────────
 
 function LiveCard({ label, value, sub, icon, color, bg }: {
   label: string; value: number | string; sub: string;
@@ -190,6 +322,7 @@ function StatusPill({ status, count }: { status: string; count: number }) {
 
 function ActivityRow({ event }: { event: ActivityEvent }) {
   const isAssignment = event.event_type === 'assignment';
+  const isSystem = event.event_type === 'system';
   const timeAgo = formatDistanceToNow(parseISO(event.event_time), { addSuffix: true, locale: he });
 
   const statusLabels: Record<string, string> = {
@@ -202,20 +335,37 @@ function ActivityRow({ event }: { event: ActivityEvent }) {
     assigned: 'שובצה',
     covered: 'כוסתה',
     uncovered: 'לא כוסתה',
+    holes: 'חורים',
+  };
+
+  const reasonLabels: Record<string, string> = {
+    sick: 'מחלה',
+    vacation: 'חופשה',
+    personal: 'אישי',
   };
 
   return (
     <div className="flex items-start gap-3 py-2.5 px-2 rounded-lg hover:bg-slate-50 transition-colors">
-      <div className={`mt-0.5 p-1.5 rounded-lg ${isAssignment ? 'bg-sky-50' : 'bg-red-50'}`}>
-        {isAssignment ? (
+      <div className={`mt-0.5 p-1.5 rounded-lg ${
+        isSystem ? 'bg-red-50' :
+        isAssignment ? 'bg-sky-50' : 'bg-amber-50'
+      }`}>
+        {isSystem ? (
+          <AlertTriangle size={14} className="text-red-500" />
+        ) : isAssignment ? (
           <ArrowLeftRight size={14} className="text-sky-500" />
         ) : (
-          <AlertTriangle size={14} className="text-red-500" />
+          <MapPin size={14} className="text-amber-500" />
         )}
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm text-navy-900">
-          {isAssignment ? (
+          {isSystem ? (
+            <>
+              <span className="font-bold text-red-600">{event.details.kindergarten}</span>
+              {' '}ללא כיסוי ב{format(parseISO(event.details.date), 'EEEE d/M', { locale: he })}
+            </>
+          ) : isAssignment ? (
             <>
               <span className="font-semibold">{event.details.substitute}</span>
               {' '}{statusLabels[event.status] || event.status}{' '}
@@ -225,16 +375,19 @@ function ActivityRow({ event }: { event: ActivityEvent }) {
             <>
               היעדרות של <span className="font-semibold">{event.details.employee}</span>
               {' '}ב<span className="font-medium">{event.details.kindergarten}</span>
-              {event.details.reason && <span className="text-slate-400"> ({event.details.reason === 'sick' ? 'מחלה' : event.details.reason === 'vacation' ? 'חופשה' : event.details.reason})</span>}
+              {event.details.reason && (
+                <span className="text-slate-400"> ({reasonLabels[event.details.reason] || event.details.reason})</span>
+              )}
             </>
           )}
         </p>
         <p className="text-xs text-slate-400 mt-0.5">{timeAgo}</p>
       </div>
-      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+      <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${
         event.status === 'completed' || event.status === 'covered' ? 'bg-green-100 text-green-700' :
-        event.status === 'cancelled' || event.status === 'uncovered' ? 'bg-red-100 text-red-700' :
+        event.status === 'cancelled' || event.status === 'uncovered' || event.status === 'holes' ? 'bg-red-100 text-red-700' :
         event.status === 'open' ? 'bg-amber-100 text-amber-700' :
+        event.status === 'confirmed' ? 'bg-blue-100 text-blue-700' :
         'bg-slate-100 text-slate-600'
       }`}>
         {statusLabels[event.status] || event.status}
