@@ -13,6 +13,7 @@ import AssignmentsPage from './pages/AssignmentsPage';
 import AbsencesPage from './pages/AbsencesPage';
 import ActivityDashboard from './pages/ActivityDashboard';
 import ReportsPage from './pages/ReportsPage';
+import ProfilePage from './pages/ProfilePage';
 import { useAuthStore } from './context/authStore';
 
 const queryClient = new QueryClient({
@@ -57,7 +58,7 @@ export default function App() {
               <Route path="/activity" element={<ActivityDashboard />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/settings" element={<div className="text-slate-400 text-center py-20">בפיתוח...</div>} />
-              <Route path="/profile" element={<div className="text-slate-400 text-center py-20">בפיתוח...</div>} />
+              <Route path="/profile" element={<ProfilePage />} />
               <Route path="/availability" element={<div className="text-slate-400 text-center py-20">בפיתוח...</div>} />
             </Route>
           </Route>

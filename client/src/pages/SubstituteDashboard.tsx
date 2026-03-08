@@ -362,16 +362,6 @@ export default function SubstituteDashboard() {
             </p>
           </div>
 
-          {/* Work permit warning */}
-          {!permitOk && (
-            <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start gap-3">
-              <AlertCircle size={20} className="text-red-500 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold text-red-700 text-sm">תיק עובד לא תקף</p>
-                <p className="text-red-600 text-xs mt-0.5">אי אפשר לשבץ אותך ללא תיק עובד תקף. פני למדריכת הגנים שלך.</p>
-              </div>
-            </div>
-          )}
 
           {/* Today's assignment */}
           {selectedDayAsgn ? (

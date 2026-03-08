@@ -139,7 +139,8 @@ export default function DashboardPage() {
     queryFn: () => api.get('/kindergartens').then(r => r.data),
   });
 
-  const kgs = kindergartens && kindergartens.length > 0 ? kindergartens : MOCK_KINDERGARTENS;
+  // Always use mock kindergartens since assignments are mock data
+  const kgs = MOCK_KINDERGARTENS;
 
   // All assignments for the visible range
   const allAssignments = useMemo(() => [...MOCK_ASSIGNMENTS, ...localAssignments], [localAssignments]);
@@ -404,7 +405,7 @@ export default function DashboardPage() {
                     return (
                       <button
                         key={dateStr}
-                        onClick={() => { setSelectedDay(day); setViewMode('week'); }}
+                        onClick={() => { setSelectedDay(day); setCurrentDate(day); setViewMode('week'); }}
                         className={`w-full flex items-center gap-3 py-3 px-4 rounded-xl transition-all text-right ${
                           hol ? 'bg-purple-50 border border-purple-200' :
                           dayHoles > 0 ? 'bg-red-50 border border-red-200' :
