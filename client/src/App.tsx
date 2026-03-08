@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 
+import ErrorBoundary from './components/ErrorBoundary';
 import LoginPage from './pages/LoginPage';
 import AppLayout from './components/layout/AppLayout';
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -32,6 +33,7 @@ function SmartDashboard() {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
+    <ErrorBoundary>
       <BrowserRouter>
         <Routes>
           {/* Public */}
@@ -76,6 +78,7 @@ export default function App() {
           success: { iconTheme: { primary: '#17C98A', secondary: 'white' } },
         }}
       />
+    </ErrorBoundary>
     </QueryClientProvider>
   );
 }
