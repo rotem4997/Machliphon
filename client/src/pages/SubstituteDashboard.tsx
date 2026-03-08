@@ -9,6 +9,7 @@ import { useAuthStore } from '@/context/authStore';
 import toast from 'react-hot-toast';
 import { format, parseISO, startOfWeek, addDays, addWeeks, addMonths, subWeeks, subMonths, isSameDay, isSameMonth } from 'date-fns';
 import { he } from 'date-fns/locale';
+import { isHoliday } from '@/utils/holidays';
 
 interface Assignment {
   id: string;
@@ -284,6 +285,8 @@ export default function SubstituteDashboard() {
   };
 
   const getDateStatus = (dateStr: string) => {
+    const hol = isHoliday(dateStr);
+    if (hol) return 'holiday';
     const assignment = allAssignments.find(a => a.assignment_date === dateStr);
     if (assignment) return 'assigned';
     if (unavailableDates.includes(dateStr)) return 'unavailable';
@@ -525,7 +528,9 @@ export default function SubstituteDashboard() {
                       } ${
                         isToday ? 'ring-2 ring-mint-400 ring-offset-1' : ''
                       } ${
-                        status === 'assigned'
+                        status === 'holiday'
+                          ? 'bg-purple-50 border-purple-200 text-purple-600'
+                          : status === 'assigned'
                           ? 'bg-mint-100 border-mint-300 text-mint-700'
                           : status === 'unavailable'
                           ? 'bg-red-50 border-red-200 text-red-400'
@@ -535,6 +540,9 @@ export default function SubstituteDashboard() {
                       <span className={`text-sm font-bold ${isToday ? 'text-mint-500' : ''}`}>
                         {format(day, 'd')}
                       </span>
+                      {status === 'holiday' && (
+                        <span className="text-[9px] leading-tight font-medium text-purple-500">{isHoliday(dateStr)?.name}</span>
+                      )}
                       {status === 'assigned' && assignment && (
                         <span className="text-[10px] leading-tight font-medium">{assignment.kindergarten_name}</span>
                       )}
@@ -572,7 +580,9 @@ export default function SubstituteDashboard() {
                       } ${
                         isToday ? 'ring-2 ring-mint-400 ring-offset-1' : ''
                       } ${
-                        status === 'assigned'
+                        status === 'holiday'
+                          ? 'bg-purple-50 text-purple-600'
+                          : status === 'assigned'
                           ? 'bg-mint-100 text-mint-700 font-bold'
                           : status === 'unavailable'
                           ? 'bg-red-50 text-red-400'
@@ -580,6 +590,7 @@ export default function SubstituteDashboard() {
                       }`}
                     >
                       {format(day, 'd')}
+                      {status === 'holiday' && <div className="w-1.5 h-1.5 bg-purple-400 rounded-full mx-auto mt-0.5" />}
                       {status === 'assigned' && <div className="w-1.5 h-1.5 bg-mint-500 rounded-full mx-auto mt-0.5" />}
                       {status === 'unavailable' && <div className="w-1.5 h-1.5 bg-red-400 rounded-full mx-auto mt-0.5" />}
                     </button>
@@ -670,6 +681,10 @@ export default function SubstituteDashboard() {
               <div className="flex items-center gap-1.5 text-xs text-slate-500">
                 <div className="w-3 h-3 rounded-full bg-navy-900" />
                 שיבוץ
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                <div className="w-3 h-3 rounded-full bg-purple-400" />
+                חג
               </div>
             </div>
           </div>
