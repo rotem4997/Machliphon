@@ -205,6 +205,9 @@ export default function SubstituteDashboard() {
     },
   });
 
+  // Track mock assignment status changes locally
+  const [mockStatusOverrides, setMockStatusOverrides] = useState<Record<string, string>>({});
+
   // Use real data if available, else auth store user, else mock
   const p = profile || (authUser ? {
     first_name: authUser.firstName,
@@ -221,9 +224,6 @@ export default function SubstituteDashboard() {
   );
   const selectedDayStr = format(selectedDay, 'yyyy-MM-dd');
   const selectedDayAsgn = todayAssignment ?? allAssignments.find(a => a.assignment_date === selectedDayStr) ?? null;
-
-  // Track mock assignment status changes locally
-  const [mockStatusOverrides, setMockStatusOverrides] = useState<Record<string, string>>({});
 
   const confirmAssignment = useMutation({
     mutationFn: async (id: string) => {
@@ -312,6 +312,9 @@ export default function SubstituteDashboard() {
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (profileForm.photo_url?.startsWith('blob:')) {
+        URL.revokeObjectURL(profileForm.photo_url);
+      }
       const url = URL.createObjectURL(file);
       setProfileForm(prev => ({ ...prev, photo_url: url }));
       toast.success('תמונה הועלתה בהצלחה');
