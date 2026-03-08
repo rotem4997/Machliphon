@@ -71,18 +71,20 @@ const MOCK_AVAILABLE_SUBS: AvailableSub[] = [
 function generateMockAssignments(): Assignment[] {
   const today = new Date();
   const assignments: Assignment[] = [];
-  // Generate some assignments for current month
   const kgs = MOCK_KINDERGARTENS;
   const subs = MOCK_AVAILABLE_SUBS;
+  // Track which subs are used per day to avoid double-booking
   for (let dayOffset = -5; dayOffset <= 20; dayOffset++) {
     const date = addDays(today, dayOffset);
-    if (date.getDay() === 6) continue; // skip Saturday
+    if (date.getDay() === 6) continue;
     const dateStr = format(date, 'yyyy-MM-dd');
-    if (isHoliday(dateStr)) continue; // skip holidays
-    // Assign ~60% of kindergartens per day to create visible holes
+    if (isHoliday(dateStr)) continue;
+    const usedSubIds = new Set<string>();
     kgs.forEach((kg, ki) => {
       if ((dayOffset + ki) % 3 === 0) return; // create holes
-      const sub = subs[ki % subs.length];
+      // Pick a sub not yet used today
+      const availSub = subs.find(s => !usedSubIds.has(s.id)) || subs[ki % subs.length];
+      usedSubIds.add(availSub.id);
       assignments.push({
         id: `mock-asgn-${dateStr}-${kg.id}`,
         assignment_date: dateStr,
@@ -93,9 +95,9 @@ function generateMockAssignments(): Assignment[] {
         kindergarten_name: kg.name,
         kindergarten_address: kg.address,
         neighborhood: kg.neighborhood,
-        substitute_first_name: sub.first_name,
-        substitute_last_name: sub.last_name,
-        substitute_phone: sub.phone,
+        substitute_first_name: availSub.first_name,
+        substitute_last_name: availSub.last_name,
+        substitute_phone: availSub.phone,
         notes: null,
       });
     });
@@ -577,16 +579,22 @@ export default function DashboardPage() {
       </div>
 
       {/* ─── Assign Modal ─── */}
-      {assignModal && (
-        <AssignModal
-          kindergartenId={assignModal.kindergartenId}
-          kindergartenName={kgs.find(k => k.id === assignModal.kindergartenId)?.name || ''}
-          date={assignModal.date}
-          availableSubs={MOCK_AVAILABLE_SUBS}
-          onClose={() => setAssignModal(null)}
-          onAssign={(subId) => handleAssign(assignModal.kindergartenId, subId, assignModal.date)}
-        />
-      )}
+      {assignModal && (() => {
+        // Filter out subs already assigned on this date
+        const dateAsgns = allAssignments.filter(a => a.assignment_date === assignModal.date);
+        const assignedSubNames = new Set(dateAsgns.map(a => `${a.substitute_first_name} ${a.substitute_last_name}`));
+        const freeSubs = MOCK_AVAILABLE_SUBS.filter(s => !assignedSubNames.has(`${s.first_name} ${s.last_name}`));
+        return (
+          <AssignModal
+            kindergartenId={assignModal.kindergartenId}
+            kindergartenName={kgs.find(k => k.id === assignModal.kindergartenId)?.name || ''}
+            date={assignModal.date}
+            availableSubs={freeSubs}
+            onClose={() => setAssignModal(null)}
+            onAssign={(subId) => handleAssign(assignModal.kindergartenId, subId, assignModal.date)}
+          />
+        );
+      })()}
     </div>
   );
 }
@@ -608,76 +616,119 @@ function AssignModal({
   onAssign: (subId: string) => void;
 }) {
   const [selectedSub, setSelectedSub] = useState('');
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const selectedSubObj = availableSubs.find(s => s.id === selectedSub);
+
+  const handleConfirmAssign = () => {
+    if (selectedSub) {
+      onAssign(selectedSub);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="card p-6 w-full max-w-lg slide-in max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold text-navy-900 text-lg">שיבוץ מחליפה</h3>
-          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-lg">
-            <X size={18} />
-          </button>
-        </div>
+      {!showConfirm ? (
+        <div className="card p-6 w-full max-w-lg slide-in max-h-[90vh] overflow-y-auto">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold text-navy-900 text-lg">שיבוץ מחליפה</h3>
+            <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-lg">
+              <X size={18} />
+            </button>
+          </div>
 
-        <div className="bg-navy-900 rounded-xl p-4 mb-4 text-white">
-          <p className="text-mint-400 text-xs font-medium">גן ילדים</p>
-          <p className="font-bold text-lg">{kindergartenName}</p>
-          <p className="text-navy-300 text-sm mt-1">
-            {format(parseISO(date), 'EEEE, d בMMMM yyyy', { locale: he })}
-          </p>
-        </div>
+          <div className="bg-navy-900 rounded-xl p-4 mb-4 text-white">
+            <p className="text-mint-400 text-xs font-medium">גן ילדים</p>
+            <p className="font-bold text-lg">{kindergartenName}</p>
+            <p className="text-navy-300 text-sm mt-1">
+              {format(parseISO(date), 'EEEE, d בMMMM yyyy', { locale: he })}
+            </p>
+          </div>
 
-        <div>
-          <label className="text-sm font-semibold text-navy-900 mb-2 block">
-            בחרי מחליפה ({availableSubs.length} זמינות)
-          </label>
-          <div className="space-y-1.5 max-h-64 overflow-y-auto">
-            {availableSubs.map(s => (
-              <label
-                key={s.id}
-                className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors border ${
-                  selectedSub === s.id
-                    ? 'bg-mint-50 border-mint-300'
-                    : 'border-slate-100 hover:bg-slate-50'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="substitute"
-                  value={s.id}
-                  checked={selectedSub === s.id}
-                  onChange={() => setSelectedSub(s.id)}
-                  className="accent-mint-500"
-                />
-                <div className="w-8 h-8 rounded-full bg-navy-900 flex items-center justify-center text-xs font-bold text-mint-400 flex-shrink-0">
-                  {s.first_name[0]}{s.last_name[0]}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-navy-900">{s.first_name} {s.last_name}</p>
-                  <p className="text-xs text-slate-400">
-                    {s.education_level} • {s.years_experience} שנות ניסיון • {s.total_assignments} שיבוצים
-                  </p>
-                </div>
-                <div className="text-xs text-slate-400 flex items-center gap-1">
-                  <Phone size={10} />
-                  {s.phone}
-                </div>
-              </label>
-            ))}
+          <div>
+            <label className="text-sm font-semibold text-navy-900 mb-2 block">
+              בחרי מחליפה ({availableSubs.length} זמינות)
+            </label>
+            {availableSubs.length > 0 ? (
+              <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                {availableSubs.map(s => (
+                  <label
+                    key={s.id}
+                    className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors border ${
+                      selectedSub === s.id
+                        ? 'bg-mint-50 border-mint-300'
+                        : 'border-slate-100 hover:bg-slate-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="substitute"
+                      value={s.id}
+                      checked={selectedSub === s.id}
+                      onChange={() => setSelectedSub(s.id)}
+                      className="accent-mint-500"
+                    />
+                    <div className="w-8 h-8 rounded-full bg-navy-900 flex items-center justify-center text-xs font-bold text-mint-400 flex-shrink-0">
+                      {s.first_name[0]}{s.last_name[0]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-navy-900">{s.first_name} {s.last_name}</p>
+                      <p className="text-xs text-slate-400">
+                        {s.education_level} • {s.years_experience} שנות ניסיון • {s.total_assignments} שיבוצים
+                      </p>
+                    </div>
+                    <div className="text-xs text-slate-400 flex items-center gap-1">
+                      <Phone size={10} />
+                      {s.phone}
+                    </div>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 border border-slate-200 rounded-xl">
+                <AlertTriangle size={24} className="text-amber-400 mx-auto mb-2" />
+                <p className="text-sm text-slate-500 font-medium">כל המחליפות כבר משובצות ליום זה</p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-2 mt-5">
+            <button
+              onClick={() => selectedSub && setShowConfirm(true)}
+              disabled={!selectedSub}
+              className="btn-primary flex-1 disabled:opacity-50"
+            >
+              שבצי מחליפה
+            </button>
+            <button onClick={onClose} className="btn-secondary">ביטול</button>
           </div>
         </div>
-
-        <div className="flex gap-2 mt-5">
-          <button
-            onClick={() => selectedSub && onAssign(selectedSub)}
-            disabled={!selectedSub}
-            className="btn-primary flex-1 disabled:opacity-50"
-          >
-            שבצי מחליפה
-          </button>
-          <button onClick={onClose} className="btn-secondary">ביטול</button>
+      ) : (
+        /* Confirmation dialog */
+        <div className="card p-6 w-full max-w-sm slide-in text-center">
+          <div className="w-14 h-14 rounded-full bg-mint-100 flex items-center justify-center mx-auto mb-4">
+            <CheckCircle size={28} className="text-mint-500" />
+          </div>
+          <h3 className="font-bold text-navy-900 text-lg mb-2">אישור שיבוץ</h3>
+          <p className="text-slate-600 text-sm mb-1">
+            לשבץ את <span className="font-bold text-navy-900">{selectedSubObj?.first_name} {selectedSubObj?.last_name}</span>
+          </p>
+          <p className="text-slate-600 text-sm mb-1">
+            ל<span className="font-bold text-navy-900">{kindergartenName}</span>
+          </p>
+          <p className="text-slate-500 text-xs mb-5">
+            {format(parseISO(date), 'EEEE, d בMMMM yyyy', { locale: he })}
+          </p>
+          <div className="flex gap-2">
+            <button onClick={handleConfirmAssign} className="btn-primary flex-1">
+              אישור
+            </button>
+            <button onClick={() => setShowConfirm(false)} className="btn-secondary flex-1">
+              חזרה
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
