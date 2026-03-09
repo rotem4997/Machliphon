@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuthStore, UserRole } from '@/context/authStore';
+import Logo from '@/components/Logo';
 
 const navItems: Record<UserRole, { href: string; label: string; icon: React.ReactNode }[]> = {
   authority_admin: [
@@ -48,9 +49,7 @@ export default function AppLayout() {
       {/* Logo */}
       <div className="px-5 py-6 border-b border-navy-800">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-mint-500 flex items-center justify-center text-lg shadow-sm">
-            🔄
-          </div>
+          <Logo size={36} />
           <div>
             <h1 className="font-black text-white text-lg leading-tight">מחליפון</h1>
             <p className="text-navy-400 text-xs">{user.authorityName || 'מערכת'}</p>
@@ -128,7 +127,10 @@ export default function AppLayout() {
           <button onClick={() => setSidebarOpen(true)} className="text-slate-600">
             <Menu size={22} />
           </button>
-          <span className="font-black text-navy-900">מחליפון</span>
+          <div className="flex items-center gap-2">
+            <Logo size={28} />
+            <span className="font-black text-navy-900">מחליפון</span>
+          </div>
           <button className="text-slate-600 relative">
             <Bell size={22} />
           </button>

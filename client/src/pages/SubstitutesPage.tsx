@@ -1,11 +1,18 @@
 import { useState } from 'react';
 import {
   Search, Plus, X, Phone, Mail, MapPin, CheckCircle, XCircle,
-  Clock, ChevronRight, Send, User, GraduationCap, CreditCard,
+  Clock, Send, User, GraduationCap, CreditCard, Download,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 // ─── Types ───────────────────────────────────────────────────
+interface Address {
+  street: string;
+  number: string;
+  city: string;
+  zipCode: string;
+}
+
 interface Substitute {
   id: string;
   firstName: string;
@@ -13,7 +20,7 @@ interface Substitute {
   phone: string;
   email: string;
   idNumber: string;
-  address: string;
+  address: Address;
   education: string;
   hasWorkLicense: boolean;
   status: 'active' | 'inactive' | 'pending_approval';
@@ -22,41 +29,75 @@ interface Substitute {
   hasAssignmentToday: boolean;
 }
 
+// ─── Validation ──────────────────────────────────────────────
+function validateIdNumber(id: string): string | null {
+  const digits = id.replace(/\D/g, '');
+  if (digits.length !== 9) return 'תעודת זהות חייבת להכיל 9 ספרות';
+  return null;
+}
+
+function validatePhone(phone: string): string | null {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length !== 10) return 'מספר טלפון חייב להכיל 10 ספרות';
+  return null;
+}
+
+function validateEmail(email: string): string | null {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) return 'כתובת אימייל לא תקינה';
+  return null;
+}
+
+function formatAddress(addr: Address): string {
+  const parts = [
+    addr.street && addr.number ? `${addr.street} ${addr.number}` : addr.street,
+    addr.city,
+    addr.zipCode,
+  ].filter(Boolean);
+  return parts.join(', ');
+}
+
 // ─── Mock Data ───────────────────────────────────────────────
 const INITIAL_SUBSTITUTES: Substitute[] = [
   {
-    id: 'sub-1', firstName: 'נועה', lastName: 'ישראלי', phone: '054-1111111',
-    email: 'noa@email.com', idNumber: '123456789', address: 'רחוב הרצל 5, תל אביב',
+    id: 'sub-1', firstName: 'נועה', lastName: 'ישראלי', phone: '0541111111',
+    email: 'noa@email.com', idNumber: '123456789',
+    address: { street: 'רחוב הרצל', number: '5', city: 'תל אביב', zipCode: '6120101' },
     education: 'תואר ראשון בחינוך', hasWorkLicense: true, status: 'active',
     assignmentsThisMonth: 8, totalAssignments: 42, hasAssignmentToday: true,
   },
   {
-    id: 'sub-2', firstName: 'שירה', lastName: 'לוי', phone: '054-2222222',
-    email: 'shira@email.com', idNumber: '234567890', address: 'רחוב ויצמן 12, רמת גן',
+    id: 'sub-2', firstName: 'שירה', lastName: 'לוי', phone: '0542222222',
+    email: 'shira@email.com', idNumber: '234567890',
+    address: { street: 'רחוב ויצמן', number: '12', city: 'רמת גן', zipCode: '5250001' },
     education: 'תעודת הוראה', hasWorkLicense: true, status: 'active',
     assignmentsThisMonth: 5, totalAssignments: 28, hasAssignmentToday: false,
   },
   {
-    id: 'sub-3', firstName: 'מיה', lastName: 'כהן', phone: '054-3333333',
-    email: 'maya@email.com', idNumber: '345678901', address: 'שדרות בן גוריון 8, חולון',
+    id: 'sub-3', firstName: 'מיה', lastName: 'כהן', phone: '0543333333',
+    email: 'maya@email.com', idNumber: '345678901',
+    address: { street: 'שדרות בן גוריון', number: '8', city: 'חולון', zipCode: '5840001' },
     education: 'תואר שני בגיל הרך', hasWorkLicense: true, status: 'active',
     assignmentsThisMonth: 12, totalAssignments: 67, hasAssignmentToday: true,
   },
   {
-    id: 'sub-4', firstName: 'רוני', lastName: 'דוד', phone: '054-4444444',
-    email: 'roni@email.com', idNumber: '456789012', address: 'רחוב סוקולוב 3, הרצליה',
+    id: 'sub-4', firstName: 'רוני', lastName: 'דוד', phone: '0544444444',
+    email: 'roni@email.com', idNumber: '456789012',
+    address: { street: 'רחוב סוקולוב', number: '3', city: 'הרצליה', zipCode: '4672501' },
     education: 'סמינר למורות', hasWorkLicense: false, status: 'pending_approval',
     assignmentsThisMonth: 0, totalAssignments: 0, hasAssignmentToday: false,
   },
   {
-    id: 'sub-5', firstName: 'הדס', lastName: 'פרידמן', phone: '054-5555555',
-    email: 'hadas@email.com', idNumber: '567890123', address: 'רחוב הגפן 15, גבעתיים',
+    id: 'sub-5', firstName: 'הדס', lastName: 'פרידמן', phone: '0545555555',
+    email: 'hadas@email.com', idNumber: '567890123',
+    address: { street: 'רחוב הגפן', number: '15', city: 'גבעתיים', zipCode: '5320001' },
     education: 'תואר ראשון בפסיכולוגיה', hasWorkLicense: true, status: 'active',
     assignmentsThisMonth: 3, totalAssignments: 15, hasAssignmentToday: false,
   },
   {
-    id: 'sub-6', firstName: 'תמר', lastName: 'אברהם', phone: '054-6666666',
-    email: 'tamar@email.com', idNumber: '678901234', address: 'רחוב העצמאות 22, בת ים',
+    id: 'sub-6', firstName: 'תמר', lastName: 'אברהם', phone: '0546666666',
+    email: 'tamar@email.com', idNumber: '678901234',
+    address: { street: 'רחוב העצמאות', number: '22', city: 'בת ים', zipCode: '5930001' },
     education: 'תעודת הוראה', hasWorkLicense: true, status: 'inactive',
     assignmentsThisMonth: 0, totalAssignments: 19, hasAssignmentToday: false,
   },
@@ -67,6 +108,29 @@ const statusLabels: Record<string, { label: string; cls: string }> = {
   inactive: { label: 'לא פעילה', cls: 'bg-slate-100 text-slate-600' },
   pending_approval: { label: 'ממתינה', cls: 'bg-amber-100 text-amber-700' },
 };
+
+// ─── CSV Export ──────────────────────────────────────────────
+function exportToCSV(subs: Substitute[]) {
+  const BOM = '\uFEFF'; // UTF-8 BOM for Excel Hebrew support
+  const headers = ['שם פרטי', 'שם משפחה', 'טלפון', 'אימייל', 'ת.ז.', 'רחוב', 'מספר', 'עיר', 'מיקוד', 'השכלה', 'רישיון', 'סטטוס', 'שיבוצים החודש', 'סה"כ שיבוצים'];
+  const rows = subs.map(s => [
+    s.firstName, s.lastName, s.phone, s.email, s.idNumber,
+    s.address.street, s.address.number, s.address.city, s.address.zipCode,
+    s.education, s.hasWorkLicense ? 'כן' : 'לא',
+    statusLabels[s.status]?.label || s.status,
+    s.assignmentsThisMonth.toString(), s.totalAssignments.toString(),
+  ]);
+
+  const csvContent = BOM + [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `מחליפות_${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast.success('קובץ CSV הורד בהצלחה');
+}
 
 export default function SubstitutesPage() {
   const [substitutes, setSubstitutes] = useState<Substitute[]>(INITIAL_SUBSTITUTES);
@@ -103,10 +167,19 @@ export default function SubstitutesPage() {
           <h1 className="text-2xl font-black text-navy-900">מחליפות</h1>
           <p className="text-slate-500 text-sm mt-0.5">{substitutes.length} מחליפות ברשות</p>
         </div>
-        <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2 text-sm">
-          <Plus size={16} />
-          הוסף מחליפה
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => exportToCSV(filtered)}
+            className="btn-secondary flex items-center gap-2 text-sm"
+          >
+            <Download size={16} />
+            ייצוא CSV
+          </button>
+          <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2 text-sm">
+            <Plus size={16} />
+            הוסף מחליפה
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -215,19 +288,54 @@ function CreateSubstituteModal({
 }) {
   const [form, setForm] = useState({
     firstName: '', lastName: '', phone: '', email: '',
-    idNumber: '', address: '', education: '', hasWorkLicense: false,
+    idNumber: '', street: '', number: '', city: '', zipCode: '',
+    education: '', hasWorkLicense: false,
   });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const update = (field: string, value: string | boolean) =>
+  const update = (field: string, value: string | boolean) => {
     setForm(prev => ({ ...prev, [field]: value }));
+    // Clear error when user types
+    if (errors[field]) setErrors(prev => { const n = { ...prev }; delete n[field]; return n; });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.firstName || !form.lastName || !form.email || !form.phone || !form.idNumber) {
-      toast.error('יש למלא את כל שדות החובה');
+    const newErrors: Record<string, string> = {};
+
+    if (!form.firstName) newErrors.firstName = 'שדה חובה';
+    if (!form.lastName) newErrors.lastName = 'שדה חובה';
+
+    const idErr = validateIdNumber(form.idNumber);
+    if (idErr) newErrors.idNumber = idErr;
+
+    const phoneErr = validatePhone(form.phone);
+    if (phoneErr) newErrors.phone = phoneErr;
+
+    const emailErr = validateEmail(form.email);
+    if (emailErr) newErrors.email = emailErr;
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      toast.error('יש לתקן את השגיאות בטופס');
       return;
     }
-    onCreate(form);
+
+    onCreate({
+      firstName: form.firstName,
+      lastName: form.lastName,
+      phone: form.phone,
+      email: form.email,
+      idNumber: form.idNumber,
+      address: {
+        street: form.street,
+        number: form.number,
+        city: form.city,
+        zipCode: form.zipCode,
+      },
+      education: form.education,
+      hasWorkLicense: form.hasWorkLicense,
+    });
   };
 
   return (
@@ -244,34 +352,81 @@ function CreateSubstituteModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="label">שם פרטי *</label>
-              <input className="input" value={form.firstName} onChange={e => update('firstName', e.target.value)} required />
+              <input className={`input ${errors.firstName ? 'border-red-400 focus:ring-red-400' : ''}`} value={form.firstName} onChange={e => update('firstName', e.target.value)} />
+              {errors.firstName && <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>}
             </div>
             <div>
               <label className="label">שם משפחה *</label>
-              <input className="input" value={form.lastName} onChange={e => update('lastName', e.target.value)} required />
+              <input className={`input ${errors.lastName ? 'border-red-400 focus:ring-red-400' : ''}`} value={form.lastName} onChange={e => update('lastName', e.target.value)} />
+              {errors.lastName && <p className="text-red-500 text-xs mt-1">{errors.lastName}</p>}
             </div>
           </div>
 
           <div>
-            <label className="label">תעודת זהות *</label>
-            <input className="input" value={form.idNumber} onChange={e => update('idNumber', e.target.value)} placeholder="123456789" required />
+            <label className="label">תעודת זהות * (9 ספרות)</label>
+            <input
+              className={`input ${errors.idNumber ? 'border-red-400 focus:ring-red-400' : ''}`}
+              value={form.idNumber}
+              onChange={e => update('idNumber', e.target.value)}
+              placeholder="123456789"
+              maxLength={9}
+              dir="ltr"
+            />
+            {errors.idNumber && <p className="text-red-500 text-xs mt-1">{errors.idNumber}</p>}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="label">טלפון *</label>
-              <input className="input" type="tel" value={form.phone} onChange={e => update('phone', e.target.value)} placeholder="054-1234567" required />
+              <label className="label">טלפון * (10 ספרות)</label>
+              <input
+                className={`input ${errors.phone ? 'border-red-400 focus:ring-red-400' : ''}`}
+                type="tel"
+                value={form.phone}
+                onChange={e => update('phone', e.target.value)}
+                placeholder="0541234567"
+                maxLength={10}
+                dir="ltr"
+              />
+              {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
             </div>
             <div>
               <label className="label">אימייל *</label>
-              <input className="input" type="email" value={form.email} onChange={e => update('email', e.target.value)} placeholder="name@email.com" required />
+              <input
+                className={`input ${errors.email ? 'border-red-400 focus:ring-red-400' : ''}`}
+                type="email"
+                value={form.email}
+                onChange={e => update('email', e.target.value)}
+                placeholder="name@email.com"
+                dir="ltr"
+              />
+              {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
             </div>
           </div>
 
-          <div>
-            <label className="label">כתובת</label>
-            <input className="input" value={form.address} onChange={e => update('address', e.target.value)} placeholder="רחוב, עיר" />
-          </div>
+          {/* Address breakdown */}
+          <fieldset className="border border-slate-200 rounded-xl p-3 space-y-3">
+            <legend className="text-sm font-semibold text-navy-900 px-2">כתובת</legend>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="col-span-2">
+                <label className="text-xs text-slate-500">רחוב</label>
+                <input className="input mt-0.5" value={form.street} onChange={e => update('street', e.target.value)} placeholder="רחוב הרצל" />
+              </div>
+              <div>
+                <label className="text-xs text-slate-500">מספר</label>
+                <input className="input mt-0.5" value={form.number} onChange={e => update('number', e.target.value)} placeholder="5" dir="ltr" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-slate-500">עיר</label>
+                <input className="input mt-0.5" value={form.city} onChange={e => update('city', e.target.value)} placeholder="תל אביב" />
+              </div>
+              <div>
+                <label className="text-xs text-slate-500">מיקוד</label>
+                <input className="input mt-0.5" value={form.zipCode} onChange={e => update('zipCode', e.target.value)} placeholder="6120101" maxLength={7} dir="ltr" />
+              </div>
+            </div>
+          </fieldset>
 
           <div>
             <label className="label">השכלה</label>
@@ -320,6 +475,8 @@ function CreateSubstituteModal({
 
 /* ────── Substitute Detail Modal ────── */
 function SubstituteDetailModal({ sub, onClose }: { sub: Substitute; onClose: () => void }) {
+  const addrStr = formatAddress(sub.address);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="card p-6 w-full max-w-md slide-in max-h-[90vh] overflow-y-auto">
@@ -346,7 +503,7 @@ function SubstituteDetailModal({ sub, onClose }: { sub: Substitute; onClose: () 
           <DetailRow icon={Phone} label="טלפון" value={sub.phone} />
           <DetailRow icon={Mail} label="אימייל" value={sub.email} />
           <DetailRow icon={CreditCard} label="ת.ז." value={sub.idNumber} />
-          <DetailRow icon={MapPin} label="כתובת" value={sub.address} />
+          <DetailRow icon={MapPin} label="כתובת" value={addrStr} />
           <DetailRow icon={GraduationCap} label="השכלה" value={sub.education} />
           <div className="flex items-center gap-3 py-3">
             {sub.hasWorkLicense ? (

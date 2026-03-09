@@ -73,16 +73,30 @@ function generateMockAssignments(): Assignment[] {
   const assignments: Assignment[] = [];
   const kgs = MOCK_KINDERGARTENS;
   const subs = MOCK_AVAILABLE_SUBS;
-  // Track which subs are used per day to avoid double-booking
+
+  // Deterministic pseudo-random based on day offset for consistent display
+  // Some days are fully covered, others have 1-2 holes
   for (let dayOffset = -5; dayOffset <= 20; dayOffset++) {
     const date = addDays(today, dayOffset);
-    if (date.getDay() === 6) continue;
+    if (date.getDay() === 6) continue; // Skip Saturday
     const dateStr = format(date, 'yyyy-MM-dd');
     if (isHoliday(dateStr)) continue;
+
     const usedSubIds = new Set<string>();
+
+    // Decide which pattern this day gets:
+    // ~40% of days = fully covered, ~40% have 1 hole, ~20% have 2 holes
+    const seed = Math.abs(dayOffset * 7 + 3);
+    const pattern = seed % 5; // 0,1 = full; 2,3 = 1 hole; 4 = 2 holes
+    const holeCount = pattern <= 1 ? 0 : pattern <= 3 ? 1 : 2;
+
+    // Pick which kindergarten indices will have holes
+    const holeIndices = new Set<number>();
+    if (holeCount >= 1) holeIndices.add(seed % kgs.length);
+    if (holeCount >= 2) holeIndices.add((seed + 2) % kgs.length);
+
     kgs.forEach((kg, ki) => {
-      if ((dayOffset + ki) % 3 === 0) return; // create holes
-      // Pick a sub not yet used today
+      if (holeIndices.has(ki)) return; // This kg has a hole today
       const availSub = subs.find(s => !usedSubIds.has(s.id)) || subs[ki % subs.length];
       usedSubIds.add(availSub.id);
       assignments.push({
