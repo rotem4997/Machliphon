@@ -34,7 +34,9 @@ app.use(requestIdMiddleware);
 // ── Security middleware ──────────────────────────────────────
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({
-  origin: process.env.CLIENT_URL || true,
+  origin: process.env.NODE_ENV === 'production'
+    ? process.env.CLIENT_URL || true
+    : true,
   credentials: true,
 }));
 
@@ -125,7 +127,7 @@ async function start() {
     console.error('Migration failed, starting server anyway:', err);
   }
 
-  app.listen(PORT, () => {
+  app.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`🚀 Machliphon server running on port ${PORT}`);
     console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`   Health: http://localhost:${PORT}/health`);
