@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react';
+import Logo from './Logo';
 
 interface Props {
   children: ReactNode;
@@ -27,9 +28,7 @@ export default class ErrorBoundary extends Component<Props, State> {
         <div className="max-w-md w-full text-center">
           {/* Logo */}
           <div className="flex items-center justify-center gap-3 mb-8">
-            <div className="w-12 h-12 rounded-2xl bg-mint-500 flex items-center justify-center text-2xl shadow-md">
-              🔄
-            </div>
+            <Logo size={48} />
             <h1 className="font-black text-navy-900 text-3xl">מחליפון</h1>
           </div>
 

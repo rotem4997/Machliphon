@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../context/authStore';
+import Logo from '../components/Logo';
 import toast from 'react-hot-toast';
 
 export default function LoginPage() {
@@ -40,9 +41,7 @@ export default function LoginPage() {
       <div className="relative w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-mint-500 shadow-lg mb-4">
-            <span className="text-2xl">🔄</span>
-          </div>
+          <Logo size={64} className="mx-auto shadow-lg" />
           <h1 className="text-3xl font-black text-white tracking-tight">מחליפון</h1>
           <p className="text-navy-300 mt-1 font-medium">ניהול חכם של מחליפות בגני ילדים</p>
         </div>
