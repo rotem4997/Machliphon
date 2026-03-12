@@ -87,8 +87,12 @@ export function handleApiError(err: unknown, context?: string) {
   );
 }
 
+// In production (Vercel), call Railway API directly; in dev, use Vite proxy
+const API_BASE = import.meta.env.VITE_API_URL
+  || (window.location.hostname === 'localhost' ? '/api' : 'https://machliphon-production.up.railway.app/api');
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE,
   timeout: 15000,
   headers: { 'Content-Type': 'application/json' },
 });
@@ -119,7 +123,7 @@ api.interceptors.response.use(
         if (stored) {
           const parsed = JSON.parse(stored);
           if (parsed.state?.refreshToken) {
-            const { data } = await axios.post('/api/auth/refresh', { refreshToken: parsed.state.refreshToken });
+            const { data } = await axios.post(`${API_BASE}/auth/refresh`, { refreshToken: parsed.state.refreshToken });
             parsed.state.token = data.token;
             localStorage.setItem('machliphon-auth', JSON.stringify(parsed));
             originalRequest.headers.Authorization = `Bearer ${data.token}`;
