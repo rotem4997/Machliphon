@@ -33,9 +33,19 @@ app.use(requestIdMiddleware);
 
 // ── Security middleware ──────────────────────────────────────
 app.use(helmet({ contentSecurityPolicy: false }));
+// Build allowed origins list, ensuring https:// prefix
+const allowedOrigins: string[] = [];
+if (process.env.CLIENT_URL) {
+  const url = process.env.CLIENT_URL.startsWith('http')
+    ? process.env.CLIENT_URL
+    : `https://${process.env.CLIENT_URL}`;
+  allowedOrigins.push(url.replace(/\/$/, '')); // strip trailing slash
+}
+allowedOrigins.push('https://machliphon-client.vercel.app');
+
 app.use(cors({
   origin: process.env.NODE_ENV === 'production'
-    ? process.env.CLIENT_URL || true
+    ? allowedOrigins
     : true,
   credentials: true,
 }));
