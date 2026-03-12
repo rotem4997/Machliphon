@@ -344,7 +344,8 @@ function CreateAssignmentModal({
       onSuccess();
     },
     onError: (err: any) => {
-      toast.error(err.response?.data?.error || 'שגיאה ביצירת שיבוץ');
+      const raw = err.response?.data?.error;
+      toast.error(typeof raw === 'string' ? raw : 'שגיאה ביצירת שיבוץ');
     },
   });
 

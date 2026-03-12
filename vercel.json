@@ -18,6 +18,10 @@
       }
     },
     {
+      "src": "/assets/(.*)",
+      "dest": "/assets/$1"
+    },
+    {
       "src": "/manifest.json",
       "dest": "/manifest.json"
     },

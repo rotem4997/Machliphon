@@ -23,9 +23,10 @@ export interface ApiErrorResponse {
 export function getErrorMessage(err: unknown): string {
   if (axios.isAxiosError(err)) {
     const axErr = err as AxiosError<ApiErrorResponse>;
-    // Server returned a structured error
-    if (axErr.response?.data?.error) {
-      return axErr.response.data.error;
+    // Server returned a structured error (ensure it's a string, not an object)
+    const serverError = axErr.response?.data?.error;
+    if (typeof serverError === 'string') {
+      return serverError;
     }
     // Network / timeout
     if (axErr.code === 'ECONNABORTED') return 'הבקשה ארכה יותר מדי זמן. נסה שנית.';

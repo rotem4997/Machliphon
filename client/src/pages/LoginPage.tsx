@@ -18,7 +18,8 @@ export default function LoginPage() {
       await login(email, password);
       navigate('/dashboard');
     } catch (error: unknown) {
-      const msg = (error as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      const raw = (error as { response?: { data?: { error?: unknown } } })?.response?.data?.error;
+      const msg = typeof raw === 'string' ? raw : undefined;
       toast.error(msg || 'שגיאה בכניסה. נסה שנית.');
     }
   };
