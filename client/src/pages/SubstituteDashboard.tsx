@@ -816,7 +816,10 @@ export default function SubstituteDashboard() {
             <h3 className="font-bold text-navy-900 mb-3">זמינות מהירה</h3>
             <p className="text-xs text-slate-500 mb-3">לחצי על יום כדי לשנות זמינות</p>
             <div className="space-y-2">
-              {Array.from({ length: 5 }, (_, i) => addDays(today, i + 1)).map(day => {
+              {Array.from({ length: 7 }, (_, i) => addDays(today, i + 1))
+                .filter(d => d.getDay() !== 6) // Exclude Saturday
+                .slice(0, 5)
+                .map(day => {
                 const dateStr = format(day, 'yyyy-MM-dd');
                 const status = getDateStatus(dateStr);
                 const assignment = allAssignments.find(a => a.assignment_date === dateStr);

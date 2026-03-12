@@ -56,7 +56,6 @@ export const useAuthStore = create<AuthState>()(
       logout: () => {
         set({ user: null, token: null, refreshToken: null });
         delete api.defaults.headers.common['Authorization'];
-        window.location.href = '/login';
       },
 
       refreshAuth: async () => {
