@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Check if code was modified in this session (look for Edit, Write, or NotebookEdit tool calls in the conversation). If code WAS modified, respond with: 'Code changes detected. Run /review for code review, then /qa for QA testing before committing.' If no code was modified, respond with nothing."
+          }
+        ]
+      }
+    ]
+  }
+}
