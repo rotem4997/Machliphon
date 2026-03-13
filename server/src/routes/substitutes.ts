@@ -1,8 +1,25 @@
 import { Router, Response } from 'express';
+import crypto from 'crypto';
+import fs from 'fs';
+import bcrypt from 'bcryptjs';
+import { z } from 'zod';
 import { query } from '../db/pool';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 import { asyncHandler } from '../middleware/asyncHandler';
-import { ValidationError, NotFoundError } from '../errors/AppError';
+import { ValidationError, NotFoundError, ConflictError } from '../errors/AppError';
+import { upload } from '../middleware/upload';
+
+const createSubstituteSchema = z.object({
+  firstName: z.string().min(1, 'שם פרטי נדרש'),
+  lastName: z.string().min(1, 'שם משפחה נדרש'),
+  phone: z.string().regex(/^\d{10}$/, 'מספר טלפון חייב להכיל 10 ספרות'),
+  email: z.string().email('כתובת אימייל לא תקינה'),
+  idNumber: z.string().regex(/^\d{9}$/, 'תעודת זהות חייבת להכיל 9 ספרות'),
+  street: z.string().optional().default(''),
+  city: z.string().optional().default(''),
+  zipCode: z.string().optional().default(''),
+  educationLevel: z.string().optional().default(''),
+});
 
 const router = Router();
 router.use(authenticate);
@@ -157,6 +174,104 @@ router.put('/availability', requireRole('substitute'), asyncHandler(async (req: 
   `, [substituteId, date, isAvailable, reason || null]);
 
   return res.json({ message: 'זמינות עודכנה בהצלחה.' });
+}));
+
+// POST /api/substitutes - create new substitute (creates user + substitute record)
+router.post('/', requireRole('manager', 'authority_admin', 'super_admin'), upload.single('teachingLicense'), asyncHandler(async (req: AuthRequest, res: Response) => {
+  // Validate with Zod
+  const parsed = createSubstituteSchema.safeParse(req.body);
+  if (!parsed.success) {
+    // Clean up uploaded file if validation fails
+    if (req.file) fs.unlinkSync(req.file.path);
+    const firstError = parsed.error.errors[0]?.message || 'שדות לא תקינים';
+    throw new ValidationError(firstError, {
+      source: 'POST /api/substitutes',
+      detail: JSON.stringify(parsed.error.errors),
+    });
+  }
+
+  const { firstName, lastName, phone, email, idNumber, street, city, zipCode, educationLevel } = parsed.data;
+  const authorityId = req.user!.authority_id;
+
+  // Check for duplicate email or ID number
+  const existingUser = await query('SELECT id FROM users WHERE email = $1', [email]);
+  if (existingUser.rows.length > 0) {
+    if (req.file) fs.unlinkSync(req.file.path);
+    throw new ConflictError('כתובת אימייל כבר קיימת במערכת.', {
+      source: 'POST /api/substitutes',
+      detail: `Email ${email} already exists`,
+    });
+  }
+  const existingSub = await query('SELECT id FROM substitutes WHERE id_number = $1', [idNumber]);
+  if (existingSub.rows.length > 0) {
+    if (req.file) fs.unlinkSync(req.file.path);
+    throw new ConflictError('מספר תעודת זהות כבר קיים במערכת.', {
+      source: 'POST /api/substitutes',
+      detail: `ID number ${idNumber} already exists`,
+    });
+  }
+
+  // Generate a cryptographically random temporary password
+  const tempPassword = crypto.randomBytes(16).toString('hex');
+  const passwordHash = await bcrypt.hash(tempPassword, 12);
+
+  // Build address string
+  const addressParts = [street, city, zipCode].filter(Boolean);
+  const address = addressParts.length > 0 ? addressParts.join(', ') : null;
+  const teachingLicenseUrl = req.file ? `/uploads/${req.file.filename}` : null;
+
+  // Wrap both inserts in a transaction
+  await query('BEGIN');
+  try {
+    const userResult = await query(`
+      INSERT INTO users (authority_id, email, password_hash, role, first_name, last_name, phone)
+      VALUES ($1, $2, $3, 'substitute', $4, $5, $6) RETURNING id
+    `, [authorityId, email, passwordHash, firstName, lastName, phone]);
+    const userId = userResult.rows[0].id;
+
+    const subResult = await query(`
+      INSERT INTO substitutes (user_id, authority_id, id_number, address, education_level, teaching_license_url, status)
+      VALUES ($1, $2, $3, $4, $5, $6, 'pending_approval') RETURNING id
+    `, [userId, authorityId, idNumber, address, educationLevel || null, teachingLicenseUrl]);
+
+    await query('COMMIT');
+
+    return res.status(201).json({
+      id: subResult.rows[0].id,
+      message: 'מחליפה נוצרה בהצלחה וממתינה לאישור.',
+    });
+  } catch (err) {
+    await query('ROLLBACK');
+    if (req.file) fs.unlinkSync(req.file.path);
+    throw err;
+  }
+}));
+
+// PATCH /api/substitutes/:id/approve - approve a pending substitute
+router.patch('/:id/approve', requireRole('manager', 'authority_admin', 'super_admin'), asyncHandler(async (req: AuthRequest, res: Response) => {
+  const isSuperAdmin = req.user!.role === 'super_admin';
+  const sql = `
+    UPDATE substitutes SET status = 'active', updated_at = NOW()
+    WHERE id = $1 ${isSuperAdmin ? '' : 'AND authority_id = $2'} AND status = 'pending_approval'
+    RETURNING id, user_id
+  `;
+  const params = isSuperAdmin ? [req.params.id] : [req.params.id, req.user!.authority_id];
+  const result = await query(sql, params);
+
+  if (result.rows.length === 0) {
+    throw new NotFoundError('מחליפה לא נמצאה או כבר אושרה.', {
+      source: 'PATCH /api/substitutes/:id/approve',
+      detail: `Substitute ${req.params.id} not found or not pending`,
+    });
+  }
+
+  // Send notification to the substitute
+  await query(`
+    INSERT INTO notifications (user_id, type, title, message, data)
+    VALUES ($1, 'account_approved', 'החשבון אושר', 'החשבון שלך אושר על ידי המדריכה. כעת ניתן לקבל שיבוצים.', $2)
+  `, [result.rows[0].user_id, JSON.stringify({ substituteId: req.params.id })]);
+
+  return res.json({ message: 'מחליפה אושרה בהצלחה.' });
 }));
 
 // GET /api/substitutes/:id - get single substitute

@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Search, Phone, Mail, MapPin, CheckCircle, XCircle,
-  Clock, User, GraduationCap, CreditCard, Download, X,
+  Search, Plus, Phone, Mail, MapPin, CheckCircle, XCircle,
+  Clock, GraduationCap, CreditCard, Download, X, Upload, UserCheck,
 } from 'lucide-react';
 import api from '@/utils/api';
 import toast from 'react-hot-toast';
@@ -18,6 +18,7 @@ interface Substitute {
   address: string | null;
   neighborhood: string | null;
   education_level: string | null;
+  teaching_license_url: string | null;
   years_experience: number;
   work_permit_valid: boolean;
   work_permit_expiry: string | null;
@@ -32,8 +33,27 @@ const statusLabels: Record<string, { label: string; cls: string }> = {
   active: { label: 'פעילה', cls: 'bg-mint-100 text-mint-700' },
   inactive: { label: 'לא פעילה', cls: 'bg-slate-100 text-slate-600' },
   suspended: { label: 'מושעית', cls: 'bg-red-100 text-red-600' },
-  pending_approval: { label: 'ממתינה', cls: 'bg-amber-100 text-amber-700' },
+  pending_approval: { label: 'ממתינה לאישור', cls: 'bg-amber-100 text-amber-700' },
 };
+
+// ─── Validation ──────────────────────────────────────────────
+function validateIdNumber(id: string): string | null {
+  const digits = id.replace(/\D/g, '');
+  if (digits.length !== 9) return 'תעודת זהות חייבת להכיל 9 ספרות';
+  return null;
+}
+
+function validatePhone(phone: string): string | null {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length !== 10) return 'מספר טלפון חייב להכיל 10 ספרות';
+  return null;
+}
+
+function validateEmail(email: string): string | null {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) return 'כתובת אימייל לא תקינה';
+  return null;
+}
 
 // ─── CSV Export ──────────────────────────────────────────────
 function exportToCSV(subs: Substitute[]) {
@@ -61,12 +81,26 @@ function exportToCSV(subs: Substitute[]) {
 export default function SubstitutesPage() {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-
+  const [showCreate, setShowCreate] = useState(false);
   const [selectedSub, setSelectedSub] = useState<Substitute | null>(null);
+
+  const queryClient = useQueryClient();
 
   const { data: substitutes = [], isLoading } = useQuery<Substitute[]>({
     queryKey: ['substitutes'],
     queryFn: () => api.get('/substitutes').then(r => r.data),
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: (id: string) => api.patch(`/substitutes/${id}/approve`),
+    onSuccess: () => {
+      toast.success('מחליפה אושרה בהצלחה');
+      queryClient.invalidateQueries({ queryKey: ['substitutes'] });
+    },
+    onError: (err: any) => {
+      const msg = err.response?.data?.error;
+      toast.error(typeof msg === 'string' ? msg : 'שגיאה באישור המחליפה');
+    },
   });
 
   const filtered = substitutes.filter(s => {
@@ -83,13 +117,19 @@ export default function SubstitutesPage() {
           <h1 className="text-2xl font-black text-navy-900">מחליפות</h1>
           <p className="text-slate-500 text-sm mt-0.5">{substitutes.length} מחליפות ברשות</p>
         </div>
-        <button
-          onClick={() => exportToCSV(filtered)}
-          className="btn-secondary flex items-center gap-2 text-sm"
-        >
-          <Download size={16} />
-          ייצוא CSV
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => exportToCSV(filtered)}
+            className="btn-secondary flex items-center gap-2 text-sm"
+          >
+            <Download size={16} />
+            ייצוא CSV
+          </button>
+          <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2 text-sm">
+            <Plus size={16} />
+            הוסף מחליפה
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -180,12 +220,25 @@ export default function SubstitutesPage() {
                       )}
                     </td>
                     <td className="px-4 py-4">
-                      <button
-                        onClick={() => setSelectedSub(sub)}
-                        className="text-xs text-sky-600 hover:text-sky-700 font-medium"
-                      >
-                        פרטים
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {sub.status === 'pending_approval' && (
+                          <button
+                            onClick={() => {
+                              if (confirm('לאשר מחליפה זו?')) approveMutation.mutate(sub.id);
+                            }}
+                            className="text-xs text-mint-600 hover:text-mint-700 font-medium flex items-center gap-1"
+                          >
+                            <UserCheck size={13} />
+                            אשר
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setSelectedSub(sub)}
+                          className="text-xs text-sky-600 hover:text-sky-700 font-medium"
+                        >
+                          פרטים
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -199,14 +252,238 @@ export default function SubstitutesPage() {
         </div>
       </div>
 
+      {/* Create Modal */}
+      {showCreate && (
+        <CreateSubstituteModal
+          onClose={() => setShowCreate(false)}
+          onSuccess={() => {
+            setShowCreate(false);
+            queryClient.invalidateQueries({ queryKey: ['substitutes'] });
+          }}
+        />
+      )}
+
       {/* Detail Modal */}
-      {selectedSub && <SubstituteDetailModal sub={selectedSub} onClose={() => setSelectedSub(null)} />}
+      {selectedSub && (
+        <SubstituteDetailModal
+          sub={selectedSub}
+          onClose={() => setSelectedSub(null)}
+          onApprove={sub => {
+            if (confirm('לאשר מחליפה זו?')) approveMutation.mutate(sub.id);
+            setSelectedSub(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ────── Create Substitute Modal ────── */
+function CreateSubstituteModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const [form, setForm] = useState({
+    firstName: '', lastName: '', phone: '', email: '',
+    idNumber: '', street: '', city: '', zipCode: '',
+    educationLevel: '',
+  });
+  const [file, setFile] = useState<File | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const createMutation = useMutation({
+    mutationFn: (formData: FormData) => api.post('/substitutes', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+    onSuccess: () => {
+      toast.success('מחליפה נוצרה בהצלחה וממתינה לאישור');
+      onSuccess();
+    },
+    onError: (err: any) => {
+      const msg = err.response?.data?.error;
+      toast.error(typeof msg === 'string' ? msg : 'שגיאה ביצירת מחליפה');
+    },
+  });
+
+  const update = (field: string, value: string) => {
+    setForm(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) setErrors(prev => { const n = { ...prev }; delete n[field]; return n; });
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newErrors: Record<string, string> = {};
+
+    if (!form.firstName) newErrors.firstName = 'שדה חובה';
+    if (!form.lastName) newErrors.lastName = 'שדה חובה';
+    const idErr = validateIdNumber(form.idNumber);
+    if (idErr) newErrors.idNumber = idErr;
+    const phoneErr = validatePhone(form.phone);
+    if (phoneErr) newErrors.phone = phoneErr;
+    const emailErr = validateEmail(form.email);
+    if (emailErr) newErrors.email = emailErr;
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      toast.error('יש לתקן את השגיאות בטופס');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('firstName', form.firstName);
+    formData.append('lastName', form.lastName);
+    formData.append('phone', form.phone);
+    formData.append('email', form.email);
+    formData.append('idNumber', form.idNumber);
+    formData.append('street', form.street);
+    formData.append('city', form.city);
+    formData.append('zipCode', form.zipCode);
+    formData.append('educationLevel', form.educationLevel);
+    if (file) formData.append('teachingLicense', file);
+
+    createMutation.mutate(formData);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="card p-6 w-full max-w-lg slide-in max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-navy-900 text-lg">הוספת מחליפה חדשה</h3>
+          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-lg">
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Name */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="label">שם פרטי *</label>
+              <input className={`input ${errors.firstName ? 'border-red-400 focus:ring-red-400' : ''}`} value={form.firstName} onChange={e => update('firstName', e.target.value)} />
+              {errors.firstName && <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>}
+            </div>
+            <div>
+              <label className="label">שם משפחה *</label>
+              <input className={`input ${errors.lastName ? 'border-red-400 focus:ring-red-400' : ''}`} value={form.lastName} onChange={e => update('lastName', e.target.value)} />
+              {errors.lastName && <p className="text-red-500 text-xs mt-1">{errors.lastName}</p>}
+            </div>
+          </div>
+
+          {/* ID */}
+          <div>
+            <label className="label">תעודת זהות * (9 ספרות)</label>
+            <input
+              className={`input ${errors.idNumber ? 'border-red-400 focus:ring-red-400' : ''}`}
+              value={form.idNumber}
+              onChange={e => update('idNumber', e.target.value)}
+              placeholder="123456789"
+              maxLength={9}
+              dir="ltr"
+            />
+            {errors.idNumber && <p className="text-red-500 text-xs mt-1">{errors.idNumber}</p>}
+          </div>
+
+          {/* Phone + Email */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="label">טלפון * (10 ספרות)</label>
+              <input
+                className={`input ${errors.phone ? 'border-red-400 focus:ring-red-400' : ''}`}
+                type="tel"
+                value={form.phone}
+                onChange={e => update('phone', e.target.value)}
+                placeholder="0541234567"
+                maxLength={10}
+                dir="ltr"
+              />
+              {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
+            </div>
+            <div>
+              <label className="label">אימייל *</label>
+              <input
+                className={`input ${errors.email ? 'border-red-400 focus:ring-red-400' : ''}`}
+                type="email"
+                value={form.email}
+                onChange={e => update('email', e.target.value)}
+                placeholder="name@email.com"
+                dir="ltr"
+              />
+              {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+            </div>
+          </div>
+
+          {/* Address */}
+          <fieldset className="border border-slate-200 rounded-xl p-3 space-y-3">
+            <legend className="text-sm font-semibold text-navy-900 px-2">כתובת</legend>
+            <div>
+              <label className="text-xs text-slate-500">רחוב</label>
+              <input className="input mt-0.5" value={form.street} onChange={e => update('street', e.target.value)} placeholder="רחוב הרצל 5" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-slate-500">עיר</label>
+                <input className="input mt-0.5" value={form.city} onChange={e => update('city', e.target.value)} placeholder="תל אביב" />
+              </div>
+              <div>
+                <label className="text-xs text-slate-500">מיקוד</label>
+                <input className="input mt-0.5" value={form.zipCode} onChange={e => update('zipCode', e.target.value)} placeholder="6120101" maxLength={7} dir="ltr" />
+              </div>
+            </div>
+          </fieldset>
+
+          {/* Education */}
+          <div>
+            <label className="label">השכלה</label>
+            <select className="input" value={form.educationLevel} onChange={e => update('educationLevel', e.target.value)}>
+              <option value="">בחר...</option>
+              <option value="תעודת הוראה">תעודת הוראה</option>
+              <option value="סמינר למורות">סמינר למורות</option>
+              <option value="תואר ראשון בחינוך">תואר ראשון בחינוך</option>
+              <option value="תואר שני בגיל הרך">תואר שני בגיל הרך</option>
+              <option value="תואר ראשון אחר">תואר ראשון אחר</option>
+              <option value="אחר">אחר</option>
+            </select>
+          </div>
+
+          {/* Teaching License Upload */}
+          <div>
+            <label className="label">רישיון הוראה (PDF, JPG, PNG עד 5MB)</label>
+            <div className="relative">
+              <input
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={e => setFile(e.target.files?.[0] || null)}
+                className="hidden"
+                id="license-upload"
+              />
+              <label
+                htmlFor="license-upload"
+                className="flex items-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-mint-300 hover:bg-mint-50/50 transition-colors"
+              >
+                <Upload size={18} className="text-slate-400" />
+                <span className="text-sm text-slate-600">
+                  {file ? file.name : 'לחץ לבחירת קובץ...'}
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <button type="submit" disabled={createMutation.isPending} className="btn-primary flex-1 flex items-center justify-center gap-2">
+              {createMutation.isPending ? 'יוצר...' : (
+                <>
+                  <Plus size={16} />
+                  צור מחליפה
+                </>
+              )}
+            </button>
+            <button type="button" onClick={onClose} className="btn-secondary">ביטול</button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
 
 /* ────── Substitute Detail Modal ────── */
-function SubstituteDetailModal({ sub, onClose }: { sub: Substitute; onClose: () => void }) {
+function SubstituteDetailModal({ sub, onClose, onApprove }: { sub: Substitute; onClose: () => void; onApprove: (sub: Substitute) => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="card p-6 w-full max-w-md slide-in max-h-[90vh] overflow-y-auto">
@@ -269,6 +546,22 @@ function SubstituteDetailModal({ sub, onClose }: { sub: Substitute; onClose: () 
               </p>
             </div>
           </div>
+          {sub.teaching_license_url && (
+            <div className="flex items-center gap-3 py-3">
+              <GraduationCap size={16} className="text-slate-400 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-xs text-slate-500">רישיון הוראה</p>
+                <a
+                  href={sub.teaching_license_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm font-medium text-sky-600 hover:text-sky-700"
+                >
+                  צפה בקובץ
+                </a>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Stats */}
@@ -283,7 +576,18 @@ function SubstituteDetailModal({ sub, onClose }: { sub: Substitute; onClose: () 
           </div>
         </div>
 
-        <button onClick={onClose} className="btn-secondary w-full mt-4">סגור</button>
+        <div className="flex gap-2 mt-4">
+          {sub.status === 'pending_approval' && (
+            <button
+              onClick={() => onApprove(sub)}
+              className="btn-primary flex-1 flex items-center justify-center gap-2"
+            >
+              <UserCheck size={16} />
+              אשר מחליפה
+            </button>
+          )}
+          <button onClick={onClose} className={`btn-secondary ${sub.status === 'pending_approval' ? '' : 'w-full'}`}>סגור</button>
+        </div>
       </div>
     </div>
   );

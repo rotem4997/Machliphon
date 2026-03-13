@@ -95,6 +95,7 @@ CREATE TABLE IF NOT EXISTS substitutes (
   work_permit_number VARCHAR(50),
   -- Qualifications
   education_level VARCHAR(50), -- תואר, עוזרת, מטפלת
+  teaching_license_url VARCHAR(500), -- uploaded file path
   years_experience INTEGER DEFAULT 0,
   -- Availability
   available_days JSONB DEFAULT '["Sunday","Monday","Tuesday","Wednesday","Thursday"]',
