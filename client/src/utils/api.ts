@@ -87,10 +87,11 @@ export function handleApiError(err: unknown, context?: string) {
   );
 }
 
-// VITE_API_URL must be set for each deployment (production, staging, etc.)
-// In dev, Vite proxy handles /api → localhost:3001
+// VITE_API_URL overrides for staging/custom deployments.
+// In dev, Vite proxy handles /api → localhost:3001.
+// In production (Vercel), default to Railway API.
 const API_BASE = import.meta.env.VITE_API_URL
-  || (window.location.hostname === 'localhost' ? '/api' : '/api');
+  || (window.location.hostname === 'localhost' ? '/api' : 'https://machliphon-production.up.railway.app/api');
 
 const api = axios.create({
   baseURL: API_BASE,
