@@ -28,6 +28,9 @@ export async function runMigrations() {
   await query(schema);
   console.log('✅ Schema applied');
 
+  // Make absence_id nullable (for direct assignments without an absence report)
+  await query(`ALTER TABLE assignments ALTER COLUMN absence_id DROP NOT NULL`).catch(() => {});
+
   // Seed if no users exist
   const users = await query('SELECT COUNT(*)::int AS count FROM users');
   if (users.rows[0].count === 0) {

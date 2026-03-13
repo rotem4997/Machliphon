@@ -131,7 +131,7 @@ CREATE TABLE IF NOT EXISTS absence_reports (
 -- ============================================
 CREATE TABLE IF NOT EXISTS assignments (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  absence_id UUID NOT NULL REFERENCES absence_reports(id),
+  absence_id UUID REFERENCES absence_reports(id),
   substitute_id UUID NOT NULL REFERENCES substitutes(id),
   kindergarten_id UUID NOT NULL REFERENCES kindergartens(id),
   assigned_by UUID NOT NULL REFERENCES users(id), -- מי שיבץ

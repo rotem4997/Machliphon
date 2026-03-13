@@ -41,7 +41,10 @@ if (process.env.CLIENT_URL) {
     : `https://${process.env.CLIENT_URL}`;
   allowedOrigins.push(url.replace(/\/$/, '')); // strip trailing slash
 }
-allowedOrigins.push('https://machliphon-client.vercel.app');
+// Add additional allowed origins from ALLOWED_ORIGINS env var (comma-separated)
+if (process.env.ALLOWED_ORIGINS) {
+  process.env.ALLOWED_ORIGINS.split(',').forEach(o => allowedOrigins.push(o.trim()));
+}
 
 app.use(cors({
   origin: process.env.NODE_ENV === 'production'

@@ -87,9 +87,10 @@ export function handleApiError(err: unknown, context?: string) {
   );
 }
 
-// In production (Vercel), call Railway API directly; in dev, use Vite proxy
+// VITE_API_URL must be set for each deployment (production, staging, etc.)
+// In dev, Vite proxy handles /api → localhost:3001
 const API_BASE = import.meta.env.VITE_API_URL
-  || (window.location.hostname === 'localhost' ? '/api' : 'https://machliphon-production.up.railway.app/api');
+  || (window.location.hostname === 'localhost' ? '/api' : '/api');
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -132,7 +133,6 @@ api.interceptors.response.use(
         }
       } catch {}
       localStorage.removeItem('machliphon-auth');
-      window.location.href = '/login';
     }
     return Promise.reject(error);
   }
