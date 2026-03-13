@@ -20,9 +20,10 @@ export const upload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
   fileFilter: (_req, file, cb) => {
-    const allowed = ['.pdf', '.jpg', '.jpeg', '.png'];
+    const allowedExts = ['.pdf', '.jpg', '.jpeg', '.png'];
+    const allowedMimes = ['application/pdf', 'image/jpeg', 'image/png'];
     const ext = path.extname(file.originalname).toLowerCase();
-    if (allowed.includes(ext)) {
+    if (allowedExts.includes(ext) && allowedMimes.includes(file.mimetype)) {
       cb(null, true);
     } else {
       cb(new Error('סוג קובץ לא נתמך. יש להעלות PDF, JPG או PNG.'));
