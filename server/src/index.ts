@@ -77,6 +77,9 @@ if (process.env.NODE_ENV !== 'test') {
   app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 }
 
+// ── Serve uploaded files ─────────────────────────────────
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
+
 // ── Health check ─────────────────────────────────────────────
 app.get('/health', async (_, res) => {
   const { query: dbQuery } = await import('./db/pool');

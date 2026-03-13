@@ -31,6 +31,9 @@ export async function runMigrations() {
   // Make absence_id nullable (for direct assignments without an absence report)
   await query(`ALTER TABLE assignments ALTER COLUMN absence_id DROP NOT NULL`).catch(() => {});
 
+  // Add teaching_license_url column if missing
+  await query(`ALTER TABLE substitutes ADD COLUMN IF NOT EXISTS teaching_license_url VARCHAR(500)`).catch(() => {});
+
   // Seed if no users exist
   const users = await query('SELECT COUNT(*)::int AS count FROM users');
   if (users.rows[0].count === 0) {

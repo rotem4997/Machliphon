@@ -1,8 +1,10 @@
 import { Router, Response } from 'express';
+import bcrypt from 'bcryptjs';
 import { query } from '../db/pool';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 import { asyncHandler } from '../middleware/asyncHandler';
-import { ValidationError, NotFoundError } from '../errors/AppError';
+import { ValidationError, NotFoundError, ConflictError } from '../errors/AppError';
+import { upload } from '../middleware/upload';
 
 const router = Router();
 router.use(authenticate);
@@ -157,6 +159,88 @@ router.put('/availability', requireRole('substitute'), asyncHandler(async (req: 
   `, [substituteId, date, isAvailable, reason || null]);
 
   return res.json({ message: 'זמינות עודכנה בהצלחה.' });
+}));
+
+// POST /api/substitutes - create new substitute (creates user + substitute record)
+router.post('/', requireRole('manager', 'authority_admin', 'super_admin'), upload.single('teachingLicense'), asyncHandler(async (req: AuthRequest, res: Response) => {
+  const { firstName, lastName, phone, email, idNumber, street, city, zipCode, educationLevel } = req.body;
+  const authorityId = req.user!.authority_id;
+
+  if (!firstName || !lastName || !phone || !email || !idNumber) {
+    throw new ValidationError('חסרים שדות חובה: שם, טלפון, אימייל, ת.ז.', {
+      source: 'POST /api/substitutes',
+      detail: 'Missing required fields',
+    });
+  }
+
+  // Check for duplicate email or ID number
+  const existingUser = await query('SELECT id FROM users WHERE email = $1', [email]);
+  if (existingUser.rows.length > 0) {
+    throw new ConflictError('כתובת אימייל כבר קיימת במערכת.', {
+      source: 'POST /api/substitutes',
+      detail: `Email ${email} already exists`,
+    });
+  }
+  const existingSub = await query('SELECT id FROM substitutes WHERE id_number = $1', [idNumber]);
+  if (existingSub.rows.length > 0) {
+    throw new ConflictError('מספר תעודת זהות כבר קיים במערכת.', {
+      source: 'POST /api/substitutes',
+      detail: `ID number ${idNumber} already exists`,
+    });
+  }
+
+  // Generate a temporary password (substitute will reset via email)
+  const tempPassword = `Temp${Date.now()}!`;
+  const passwordHash = await bcrypt.hash(tempPassword, 12);
+
+  // Create user record
+  const userResult = await query(`
+    INSERT INTO users (authority_id, email, password_hash, role, first_name, last_name, phone)
+    VALUES ($1, $2, $3, 'substitute', $4, $5, $6) RETURNING id
+  `, [authorityId, email, passwordHash, firstName, lastName, phone]);
+  const userId = userResult.rows[0].id;
+
+  // Build address string
+  const addressParts = [street, city, zipCode].filter(Boolean);
+  const address = addressParts.length > 0 ? addressParts.join(', ') : null;
+
+  // File upload path
+  const teachingLicenseUrl = req.file ? `/uploads/${req.file.filename}` : null;
+
+  // Create substitute record
+  const subResult = await query(`
+    INSERT INTO substitutes (user_id, authority_id, id_number, address, education_level, teaching_license_url, status)
+    VALUES ($1, $2, $3, $4, $5, $6, 'pending_approval') RETURNING id
+  `, [userId, authorityId, idNumber, address, educationLevel || null, teachingLicenseUrl]);
+
+  return res.status(201).json({
+    id: subResult.rows[0].id,
+    message: 'מחליפה נוצרה בהצלחה וממתינה לאישור.',
+  });
+}));
+
+// PATCH /api/substitutes/:id/approve - approve a pending substitute
+router.patch('/:id/approve', requireRole('manager', 'authority_admin', 'super_admin'), asyncHandler(async (req: AuthRequest, res: Response) => {
+  const result = await query(`
+    UPDATE substitutes SET status = 'active', updated_at = NOW()
+    WHERE id = $1 AND authority_id = $2 AND status = 'pending_approval'
+    RETURNING id, user_id
+  `, [req.params.id, req.user!.authority_id]);
+
+  if (result.rows.length === 0) {
+    throw new NotFoundError('מחליפה לא נמצאה או כבר אושרה.', {
+      source: 'PATCH /api/substitutes/:id/approve',
+      detail: `Substitute ${req.params.id} not found or not pending`,
+    });
+  }
+
+  // Send notification to the substitute
+  await query(`
+    INSERT INTO notifications (user_id, type, title, message, data)
+    VALUES ($1, 'account_approved', 'החשבון אושר', 'החשבון שלך אושר על ידי המדריכה. כעת ניתן לקבל שיבוצים.', $2)
+  `, [result.rows[0].user_id, JSON.stringify({ substituteId: req.params.id })]);
+
+  return res.json({ message: 'מחליפה אושרה בהצלחה.' });
 }));
 
 // GET /api/substitutes/:id - get single substitute
