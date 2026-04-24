@@ -18,6 +18,8 @@ services:
         generateValue: true
       - key: CLIENT_URL
         value: https://machliphon-client.vercel.app
+      - key: ALLOWED_ORIGINS
+        value: https://machliphon-client.vercel.app
 
 databases:
   - name: machliphon-db
