@@ -8,7 +8,12 @@ router.use(authenticate);
 
 // GET /api/notifications
 router.get('/', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const result = await query(`SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`, [req.user!.id]);
+  const { type } = req.query; // C4: filter by notification type
+  let sql = 'SELECT * FROM notifications WHERE user_id = $1';
+  const params: unknown[] = [req.user!.id];
+  if (type) { sql += ' AND type = $2'; params.push(type); }
+  sql += ' ORDER BY created_at DESC LIMIT 50';
+  const result = await query(sql, params);
   return res.json(result.rows);
 }));
 

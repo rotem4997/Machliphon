@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 
 import ErrorBoundary from './components/ErrorBoundary';
 import LoginPage from './pages/LoginPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import AppLayout from './components/layout/AppLayout';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import DashboardPage from './pages/DashboardPage';
@@ -14,6 +15,9 @@ import AbsencesPage from './pages/AbsencesPage';
 import ActivityDashboard from './pages/ActivityDashboard';
 import ReportsPage from './pages/ReportsPage';
 import ProfilePage from './pages/ProfilePage';
+import AvailabilityPage from './pages/AvailabilityPage';
+import KnownAbsencesPage from './pages/KnownAbsencesPage';
+import ManagerKindergartensPage from './pages/ManagerKindergartensPage';
 import { useAuthStore } from './context/authStore';
 
 const queryClient = new QueryClient({
@@ -39,6 +43,7 @@ export default function App() {
         <Routes>
           {/* Public */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
           {/* Protected */}
@@ -55,11 +60,17 @@ export default function App() {
               </Route>
               <Route path="/assignments" element={<AssignmentsPage />} />
               <Route path="/absences" element={<AbsencesPage />} />
+              <Route path="/known-absences" element={<KnownAbsencesPage />} />
+              <Route path="/manager-kindergartens" element={
+                <ProtectedRoute allowedRoles={['authority_admin', 'super_admin']} />
+              }>
+                <Route index element={<ManagerKindergartensPage />} />
+              </Route>
               <Route path="/activity" element={<ActivityDashboard />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/settings" element={<div className="text-slate-400 text-center py-20">בפיתוח...</div>} />
               <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/availability" element={<div className="text-slate-400 text-center py-20">בפיתוח...</div>} />
+              <Route path="/availability" element={<AvailabilityPage />} />
             </Route>
           </Route>
 

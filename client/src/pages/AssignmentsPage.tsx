@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Calendar, Plus, CheckCircle, XCircle, Clock, MapPin,
-  ChevronRight, ChevronLeft, User, Phone, X
+  ChevronRight, ChevronLeft, User, Phone, X, AlertCircle, Star
 } from 'lucide-react';
 import api from '@/utils/api';
 import toast from 'react-hot-toast';
@@ -71,9 +71,20 @@ export default function AssignmentsPage() {
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
-  const { data: assignments, isLoading } = useQuery<Assignment[]>({
+  const { data: assignments, isLoading, isError } = useQuery<Assignment[]>({
     queryKey: ['assignments', dateStr],
     queryFn: () => api.get('/assignments', { params: { date: dateStr } }).then(r => r.data),
+  });
+
+  // B6: Rating mutation for completed assignments
+  const rateMutation = useMutation({
+    mutationFn: ({ id, rating, ratingNotes }: { id: string; rating: number; ratingNotes: string }) =>
+      api.patch(`/assignments/${id}/rate`, { rating, ratingNotes }),
+    onSuccess: () => {
+      toast.success('דירוג נשמר');
+      queryClient.invalidateQueries({ queryKey: ['assignments'] });
+    },
+    onError: () => toast.error('שגיאה בשמירת דירוג'),
   });
 
   const cancelMutation = useMutation({
@@ -98,6 +109,12 @@ export default function AssignmentsPage() {
 
   return (
     <div className="space-y-6 fade-in">
+      {isError && (
+        <div className="card p-4 flex items-center gap-3 text-red-600 bg-red-50">
+          <AlertCircle size={18} />
+          <p className="text-sm">שגיאה בטעינת השיבוצים. אנא נסה שנית.</p>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

@@ -14,6 +14,8 @@ import absencesRoutes from './routes/absences';
 import kindergartensRoutes from './routes/kindergartens';
 import notificationsRoutes from './routes/notifications';
 import activityRoutes from './routes/activity';
+import knownAbsencesRoutes from './routes/known-absences';
+import managerKindergartensRoutes from './routes/manager-kindergartens';
 import { requestIdMiddleware } from './middleware/requestId';
 import { errorHandler } from './middleware/errorHandler';
 
@@ -32,7 +34,7 @@ if (!process.env.JWT_SECRET) {
 app.use(requestIdMiddleware);
 
 // ── Security middleware ──────────────────────────────────────
-app.use(helmet({ contentSecurityPolicy: false }));
+app.use(helmet());
 // Build allowed origins list, ensuring https:// prefix
 const allowedOrigins: string[] = [];
 if (process.env.CLIENT_URL) {
@@ -69,7 +71,7 @@ app.use('/api/', limiter);
 app.use('/api/auth/', authLimiter);
 
 // ── Body parsing ─────────────────────────────────────────────
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // ── Logging ──────────────────────────────────────────────────
@@ -110,6 +112,8 @@ app.use('/api/absences', absencesRoutes);
 app.use('/api/kindergartens', kindergartensRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/activity', activityRoutes);
+app.use('/api/known-absences', knownAbsencesRoutes);
+app.use('/api/manager-kindergartens', managerKindergartensRoutes);
 
 // ── Serve frontend in production ─────────────────────────────
 if (process.env.NODE_ENV === 'production') {
