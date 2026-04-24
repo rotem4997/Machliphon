@@ -146,6 +146,23 @@ router.get('/me', requireRole('substitute'), asyncHandler(async (req: AuthReques
   });
 }));
 
+// GET /api/substitutes/availability — get own availability records for a month
+router.get('/availability', requireRole('substitute'), asyncHandler(async (req: AuthRequest, res: Response) => {
+  const { month, year } = req.query;
+  const subResult = await query('SELECT id FROM substitutes WHERE user_id = $1', [req.user!.id]);
+  if (subResult.rows.length === 0) return res.json([]);
+
+  let sql = 'SELECT * FROM substitute_availability WHERE substitute_id = $1';
+  const params: unknown[] = [subResult.rows[0].id];
+  if (month && year) {
+    sql += ' AND EXTRACT(MONTH FROM date) = $2 AND EXTRACT(YEAR FROM date) = $3';
+    params.push(month, year);
+  }
+  sql += ' ORDER BY date';
+  const result = await query(sql, params);
+  return res.json(result.rows);
+}));
+
 // PUT /api/substitutes/availability - substitute sets availability
 router.put('/availability', requireRole('substitute'), asyncHandler(async (req: AuthRequest, res: Response) => {
   const { date, isAvailable, reason } = req.body;
@@ -272,6 +289,37 @@ router.patch('/:id/approve', requireRole('manager', 'authority_admin', 'super_ad
   `, [result.rows[0].user_id, JSON.stringify({ substituteId: req.params.id })]);
 
   return res.json({ message: 'מחליפה אושרה בהצלחה.' });
+}));
+
+// PATCH /api/substitutes/:id/reject — A7: reject a pending substitute with reason
+router.patch('/:id/reject', requireRole('manager', 'authority_admin', 'super_admin'), asyncHandler(async (req: AuthRequest, res: Response) => {
+  const { reason } = req.body;
+  const isSuperAdmin = req.user!.role === 'super_admin';
+  const sql = `
+    UPDATE substitutes SET status = 'inactive', updated_at = NOW()
+    WHERE id = $1 ${isSuperAdmin ? '' : 'AND authority_id = $2'} AND status = 'pending_approval'
+    RETURNING id, user_id
+  `;
+  const params = isSuperAdmin ? [req.params.id] : [req.params.id, req.user!.authority_id];
+  const result = await query(sql, params);
+
+  if (result.rows.length === 0) {
+    throw new NotFoundError('מחליפה לא נמצאה או כבר טופלה.', {
+      source: 'PATCH /api/substitutes/:id/reject',
+      detail: `Substitute ${req.params.id} not found or not pending`,
+    });
+  }
+
+  const notifMsg = reason
+    ? `בקשתך נדחתה. סיבה: ${reason}`
+    : 'בקשתך נדחתה על ידי המדריכה.';
+
+  await query(`
+    INSERT INTO notifications (user_id, type, title, message, data)
+    VALUES ($1, 'account_rejected', 'בקשה נדחתה', $2, $3)
+  `, [result.rows[0].user_id, notifMsg, JSON.stringify({ substituteId: req.params.id, reason: reason || null })]);
+
+  return res.json({ message: 'מחליפה נדחתה.' });
 }));
 
 // GET /api/substitutes/:id - get single substitute

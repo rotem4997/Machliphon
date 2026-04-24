@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../context/authStore';
 import Logo from '../components/Logo';
@@ -100,6 +100,11 @@ export default function LoginPage() {
               )}
             </button>
           </form>
+
+          {/* Forgot password */}
+          <div className="mt-3 text-center">
+            <Link to="/forgot-password" className="text-xs text-sky-500 hover:text-sky-700">שכחתי סיסמה</Link>
+          </div>
 
           {/* Demo accounts */}
           <div className="mt-6 pt-6 border-t border-slate-100">

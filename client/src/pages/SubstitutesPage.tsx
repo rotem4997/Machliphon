@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Search, Plus, Phone, Mail, MapPin, CheckCircle, XCircle,
-  Clock, GraduationCap, CreditCard, Download, X, Upload, UserCheck,
+  Clock, GraduationCap, CreditCard, Download, X, Upload, UserCheck, AlertCircle,
 } from 'lucide-react';
 import api from '@/utils/api';
 import toast from 'react-hot-toast';
@@ -22,6 +22,7 @@ interface Substitute {
   years_experience: number;
   work_permit_valid: boolean;
   work_permit_expiry: string | null;
+  work_permit_number: string | null;
   status: 'active' | 'inactive' | 'suspended' | 'pending_approval';
   total_assignments: number;
   rating: number;
@@ -83,13 +84,26 @@ export default function SubstitutesPage() {
   const [filterStatus, setFilterStatus] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [selectedSub, setSelectedSub] = useState<Substitute | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<Substitute | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [permitTarget, setPermitTarget] = useState<Substitute | null>(null);
+  const [permitForm, setPermitForm] = useState({ number: '', expiry: '', valid: true });
 
   const queryClient = useQueryClient();
 
-  const { data: substitutes = [], isLoading } = useQuery<Substitute[]>({
+  const { data: substitutes = [], isLoading, isError } = useQuery<Substitute[]>({
     queryKey: ['substitutes'],
     queryFn: () => api.get('/substitutes').then(r => r.data),
   });
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-500">
+        <AlertCircle size={32} className="text-red-400" />
+        <p>שגיאה בטעינת המחליפות. אנא נסה שנית.</p>
+      </div>
+    );
+  }
 
   const approveMutation = useMutation({
     mutationFn: (id: string) => api.patch(`/substitutes/${id}/approve`),
@@ -101,6 +115,36 @@ export default function SubstitutesPage() {
       const msg = err.response?.data?.error;
       toast.error(typeof msg === 'string' ? msg : 'שגיאה באישור המחליפה');
     },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      api.patch(`/substitutes/${id}/reject`, { reason }),
+    onSuccess: () => {
+      toast.success('מחליפה נדחתה');
+      setRejectTarget(null);
+      setRejectReason('');
+      queryClient.invalidateQueries({ queryKey: ['substitutes'] });
+    },
+    onError: (err: any) => {
+      const msg = err.response?.data?.error;
+      toast.error(typeof msg === 'string' ? msg : 'שגיאה בדחיית המחליפה');
+    },
+  });
+
+  const permitMutation = useMutation({
+    mutationFn: ({ id }: { id: string }) =>
+      api.patch(`/substitutes/${id}/permit`, {
+        workPermitValid: permitForm.valid,
+        workPermitNumber: permitForm.number,
+        workPermitExpiry: permitForm.expiry || null,
+      }),
+    onSuccess: () => {
+      toast.success('תיק עובד עודכן בהצלחה');
+      setPermitTarget(null);
+      queryClient.invalidateQueries({ queryKey: ['substitutes'] });
+    },
+    onError: () => toast.error('שגיאה בעדכון תיק עובד'),
   });
 
   const filtered = substitutes.filter(s => {
@@ -222,16 +266,31 @@ export default function SubstitutesPage() {
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-2">
                         {sub.status === 'pending_approval' && (
-                          <button
-                            onClick={() => {
-                              if (confirm('לאשר מחליפה זו?')) approveMutation.mutate(sub.id);
-                            }}
-                            className="text-xs text-mint-600 hover:text-mint-700 font-medium flex items-center gap-1"
-                          >
-                            <UserCheck size={13} />
-                            אשר
-                          </button>
+                          <>
+                            <button
+                              onClick={() => { if (confirm('לאשר מחליפה זו?')) approveMutation.mutate(sub.id); }}
+                              className="text-xs text-mint-600 hover:text-mint-700 font-medium flex items-center gap-1"
+                            >
+                              <UserCheck size={13} />
+                              אשר
+                            </button>
+                            <button
+                              onClick={() => setRejectTarget(sub)}
+                              className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1"
+                            >
+                              <XCircle size={13} />
+                              דחה
+                            </button>
+                          </>
                         )}
+                        <button
+                          onClick={() => { setPermitTarget(sub); setPermitForm({ number: sub.work_permit_number || '', expiry: sub.work_permit_expiry || '', valid: sub.work_permit_valid }); }}
+                          className="text-xs text-amber-600 hover:text-amber-700 font-medium flex items-center gap-1"
+                          title="עדכון תיק עובד"
+                        >
+                          <CreditCard size={13} />
+                          תיק עובד
+                        </button>
                         <button
                           onClick={() => setSelectedSub(sub)}
                           className="text-xs text-sky-600 hover:text-sky-700 font-medium"
@@ -251,6 +310,69 @@ export default function SubstitutesPage() {
           </table>
         </div>
       </div>
+
+      {/* Reject Modal */}
+      {rejectTarget && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="card p-6 w-full max-w-sm space-y-4">
+            <h3 className="font-bold text-navy-900">דחיית מחליפה</h3>
+            <p className="text-sm text-slate-600">
+              {rejectTarget.first_name} {rejectTarget.last_name} — האם ברצונך לדחות את הבקשה?
+            </p>
+            <div>
+              <label className="label">סיבת הדחייה (אופציונלי)</label>
+              <textarea
+                className="input resize-none h-20"
+                value={rejectReason}
+                onChange={e => setRejectReason(e.target.value)}
+                placeholder="הסבר מדוע הבקשה נדחתה..."
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setRejectTarget(null)} className="btn-secondary text-sm">ביטול</button>
+              <button
+                onClick={() => rejectMutation.mutate({ id: rejectTarget.id, reason: rejectReason })}
+                disabled={rejectMutation.isPending}
+                className="btn-primary text-sm bg-red-500 hover:bg-red-600 disabled:opacity-50"
+              >
+                {rejectMutation.isPending ? 'שומר...' : 'דחה בקשה'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Permit Update Modal — C2 */}
+      {permitTarget && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="card p-6 w-full max-w-sm space-y-4">
+            <h3 className="font-bold text-navy-900">עדכון תיק עובד</h3>
+            <p className="text-sm text-slate-500">{permitTarget.first_name} {permitTarget.last_name}</p>
+            <div>
+              <label className="label">מספר תיק עובד</label>
+              <input className="input" value={permitForm.number} onChange={e => setPermitForm(p => ({ ...p, number: e.target.value }))} />
+            </div>
+            <div>
+              <label className="label">תאריך פקיעה</label>
+              <input className="input" type="date" value={permitForm.expiry} onChange={e => setPermitForm(p => ({ ...p, expiry: e.target.value }))} />
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="permitValid" checked={permitForm.valid} onChange={e => setPermitForm(p => ({ ...p, valid: e.target.checked }))} className="w-4 h-4" />
+              <label htmlFor="permitValid" className="text-sm text-slate-700">תיק עובד תקף</label>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setPermitTarget(null)} className="btn-secondary text-sm">ביטול</button>
+              <button
+                onClick={() => permitMutation.mutate({ id: permitTarget.id })}
+                disabled={permitMutation.isPending}
+                className="btn-primary text-sm disabled:opacity-50"
+              >
+                {permitMutation.isPending ? 'שומר...' : 'שמור'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Create Modal */}
       {showCreate && (

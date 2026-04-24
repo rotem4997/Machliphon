@@ -1,11 +1,15 @@
 import { useState, useRef } from 'react';
-import { Camera, Save, X, Edit3, Phone, Mail, MapPin, Building } from 'lucide-react';
+import { Camera, Save, X, Edit3, Phone, Mail, MapPin, Building, Key } from 'lucide-react';
 import { useAuthStore } from '@/context/authStore';
+import { useMutation } from '@tanstack/react-query';
+import api from '@/utils/api';
 import toast from 'react-hot-toast';
 
 export default function ProfilePage() {
-  const { user } = useAuthStore();
+  const { user, updateUser } = useAuthStore();
   const [editing, setEditing] = useState(false);
+  const [showPwdModal, setShowPwdModal] = useState(false);
+  const [pwdForm, setPwdForm] = useState({ current: '', next: '', confirm: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isSubstitute = user?.role === 'substitute';
@@ -14,28 +18,49 @@ export default function ProfilePage() {
     firstName: user?.firstName || '',
     lastName: user?.lastName || '',
     email: user?.email || '',
-    phone: user?.phone || '054-1234567',
-    address: isSubstitute ? 'רחוב הרצל 15, תל אביב' : '',
-    education: isSubstitute ? 'תואר ראשון בחינוך' : '',
+    phone: user?.phone || '',
+    address: '',
+    education: '',
     photoUrl: '',
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: () => api.patch('/auth/me', {
+      firstName: form.firstName,
+      lastName: form.lastName,
+      phone: form.phone,
+      address: isSubstitute ? form.address : undefined,
+    }),
+    onSuccess: (res) => {
+      const u = res.data;
+      updateUser({
+        firstName: u.first_name,
+        lastName: u.last_name,
+        phone: u.phone,
+      });
+      setEditing(false);
+      toast.success('הפרופיל עודכן בהצלחה');
+    },
+    onError: () => toast.error('שגיאה בשמירת הפרופיל'),
+  });
+
+  const pwdMutation = useMutation({
+    mutationFn: () => api.post('/auth/change-password', { currentPassword: pwdForm.current, newPassword: pwdForm.next }),
+    onSuccess: () => { setShowPwdModal(false); setPwdForm({ current: '', next: '', confirm: '' }); toast.success('הסיסמה שונתה'); },
+    onError: (err: any) => toast.error(err?.response?.data?.error || 'שגיאה בשינוי סיסמה'),
   });
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (form.photoUrl?.startsWith('blob:')) {
-        URL.revokeObjectURL(form.photoUrl);
-      }
+      if (form.photoUrl?.startsWith('blob:')) URL.revokeObjectURL(form.photoUrl);
       const url = URL.createObjectURL(file);
       setForm(prev => ({ ...prev, photoUrl: url }));
       toast.success('תמונה הועלתה');
     }
   };
 
-  const handleSave = () => {
-    setEditing(false);
-    toast.success('הפרופיל עודכן בהצלחה');
-  };
+  const handleSave = () => saveMutation.mutate();
 
   const roleName = {
     substitute: 'מחליפה',
@@ -59,9 +84,9 @@ export default function ProfilePage() {
           </button>
         ) : (
           <div className="flex gap-2">
-            <button onClick={handleSave} className="btn-primary flex items-center gap-2 text-sm">
+            <button onClick={handleSave} disabled={saveMutation.isPending} className="btn-primary flex items-center gap-2 text-sm disabled:opacity-50">
               <Save size={16} />
-              שמור
+              {saveMutation.isPending ? 'שומר...' : 'שמור'}
             </button>
             <button onClick={() => setEditing(false)} className="btn-secondary flex items-center gap-2 text-sm text-red-500">
               <X size={16} />
@@ -222,6 +247,52 @@ export default function ProfilePage() {
           )}
         </div>
       </div>
+
+      {/* Change Password */}
+      <div className="card p-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Key size={16} className="text-slate-400" />
+          <div>
+            <p className="text-sm font-medium text-navy-900">שינוי סיסמה</p>
+            <p className="text-xs text-slate-400">עדכן את הסיסמה שלך</p>
+          </div>
+        </div>
+        <button onClick={() => setShowPwdModal(true)} className="btn-secondary text-sm">שנה סיסמה</button>
+      </div>
+
+      {/* Password Change Modal */}
+      {showPwdModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="card p-6 w-full max-w-sm space-y-4">
+            <h3 className="font-bold text-navy-900 text-lg">שינוי סיסמה</h3>
+            <div>
+              <label className="label">סיסמה נוכחית</label>
+              <input className="input" type="password" value={pwdForm.current} onChange={e => setPwdForm(p => ({ ...p, current: e.target.value }))} />
+            </div>
+            <div>
+              <label className="label">סיסמה חדשה</label>
+              <input className="input" type="password" value={pwdForm.next} onChange={e => setPwdForm(p => ({ ...p, next: e.target.value }))} />
+            </div>
+            <div>
+              <label className="label">אימות סיסמה חדשה</label>
+              <input className="input" type="password" value={pwdForm.confirm} onChange={e => setPwdForm(p => ({ ...p, confirm: e.target.value }))} />
+            </div>
+            {pwdForm.next && pwdForm.confirm && pwdForm.next !== pwdForm.confirm && (
+              <p className="text-xs text-red-500">הסיסמאות אינן זהות</p>
+            )}
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setShowPwdModal(false)} className="btn-secondary text-sm">ביטול</button>
+              <button
+                onClick={() => pwdMutation.mutate()}
+                disabled={!pwdForm.current || !pwdForm.next || pwdForm.next !== pwdForm.confirm || pwdMutation.isPending}
+                className="btn-primary text-sm disabled:opacity-50"
+              >
+                {pwdMutation.isPending ? 'שומר...' : 'שמור'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

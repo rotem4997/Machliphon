@@ -40,14 +40,40 @@ router.post('/', requireRole('manager', 'authority_admin', 'super_admin'), async
       meta: { kindergartenId, absentEmployeeName, absenceDate },
     });
   }
-  const kgCheck = await query('SELECT id FROM kindergartens WHERE id = $1 AND authority_id = $2', [kindergartenId, req.user!.authority_id]);
+  // A8: For managers, scope to their assigned kindergartens only
+  let kgCheck;
+  if (req.user!.role === 'manager') {
+    const mgr = await query('SELECT id FROM managers WHERE user_id = $1', [req.user!.id]);
+    if (mgr.rows.length === 0) throw new NotFoundError('מנהלת לא נמצאה.', { source: 'POST /api/absences', detail: 'No manager profile' });
+    kgCheck = await query(
+      'SELECT k.id FROM kindergartens k JOIN manager_kindergartens mk ON k.id = mk.kindergarten_id WHERE k.id = $1 AND mk.manager_id = $2',
+      [kindergartenId, mgr.rows[0].id]
+    );
+  } else {
+    kgCheck = await query('SELECT id FROM kindergartens WHERE id = $1 AND authority_id = $2', [kindergartenId, req.user!.authority_id]);
+  }
   if (kgCheck.rows.length === 0) {
-    throw new NotFoundError('גן ילדים לא נמצא.', { source: 'POST /api/absences', detail: `Kindergarten ${kindergartenId} not in authority` });
+    throw new NotFoundError('גן ילדים לא נמצא או אין הרשאה.', { source: 'POST /api/absences', detail: `Kindergarten ${kindergartenId} not accessible` });
   }
   const result = await query(`
     INSERT INTO absence_reports (kindergarten_id, reported_by, absent_employee_name, absent_employee_role, absence_date, absence_reason, notes, status)
     VALUES ($1, $2, $3, $4, $5, $6, $7, 'open') RETURNING *
   `, [kindergartenId, req.user!.id, absentEmployeeName, absentEmployeeRole || 'teacher', absenceDate, absenceReason || null, notes || null]);
+
+  // D4: Escalation — notify authority_admin that an absence needs coverage
+  const admins = await query(`SELECT id FROM users WHERE role = 'authority_admin' AND authority_id = $1`, [req.user!.authority_id]);
+  const kgName = await query('SELECT name FROM kindergartens WHERE id = $1', [kindergartenId]);
+  for (const admin of admins.rows) {
+    await query(`
+      INSERT INTO notifications (user_id, type, title, message, data)
+      VALUES ($1, 'absence_uncovered', 'היעדרות חדשה דורשת שיבוץ', $2, $3)
+    `, [
+      admin.id,
+      `${absentEmployeeName} נעדרת מ${kgName.rows[0]?.name || 'גן'} בתאריך ${absenceDate} — נדרש שיבוץ.`,
+      JSON.stringify({ absenceId: result.rows[0].id, kindergartenId, date: absenceDate }),
+    ]);
+  }
+
   return res.status(201).json(result.rows[0]);
 }));
 

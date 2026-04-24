@@ -150,6 +150,8 @@ CREATE TABLE IF NOT EXISTS assignments (
   -- Notes
   notes TEXT,
   cancellation_reason TEXT,
+  rating DECIMAL(2,1) CHECK (rating >= 1 AND rating <= 5),
+  rating_notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

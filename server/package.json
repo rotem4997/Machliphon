@@ -7,7 +7,8 @@
     "build": "tsc && cp src/db/schema.sql dist/db/schema.sql",
     "start": "node dist/index.js",
     "db:migrate": "ts-node src/db/migrate.ts",
-    "db:seed": "ts-node src/db/seed.ts"
+    "db:seed": "ts-node src/db/seed.ts",
+    "db:seed-full": "ts-node src/db/seed-full.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

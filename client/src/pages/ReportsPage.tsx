@@ -4,6 +4,7 @@ import {
   BarChart3, FileText, Download, TrendingUp
 } from 'lucide-react';
 import api from '@/utils/api';
+import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 import {
@@ -81,8 +82,22 @@ export default function ReportsPage() {
   }, {} as Record<string, number>) ?? {};
   const kgBarData = Object.entries(perKg).map(([name, count]) => ({ name, count }));
 
-  const handleExport = () => {
-    window.open(`/api/assignments/export/csv?month=${month}&year=${year}`, '_blank');
+  const handleExport = async () => {
+    try {
+      const response = await api.get(`/assignments/export/csv?month=${month}&year=${year}`, {
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `madganet_${year}_${month}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('קובץ מדגנט הורד בהצלחה');
+    } catch {
+      toast.error('שגיאה בייצוא הקובץ');
+    }
   };
 
   return (

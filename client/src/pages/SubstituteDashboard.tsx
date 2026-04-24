@@ -257,15 +257,42 @@ export default function SubstituteDashboard() {
     onError: (err) => handleApiError(err, 'markArrived'),
   });
 
+  // B4: Substitute cancel
+  const cancelAssignment = useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
+      if (id.startsWith('mock-')) {
+        setMockStatusOverrides(prev => ({ ...prev, [id]: 'cancelled' }));
+        return {};
+      }
+      return api.patch(`/assignments/${id}/substitute-cancel`, { reason });
+    },
+    onSuccess: () => {
+      toast.success('השיבוץ בוטל.');
+      queryClient.invalidateQueries({ queryKey: ['today-assignment'] });
+    },
+    onError: () => toast.error('שגיאה בביטול השיבוץ'),
+  });
+
   const permitOk = p?.work_permit_valid &&
     new Date(p.work_permit_expiry) > new Date();
 
   const greetingHour = new Date().getHours();
   const greeting = greetingHour < 12 ? 'בוקר טוב' : greetingHour < 17 ? 'צהריים טובים' : 'ערב טוב';
 
-  // ─── Availability toggle ──────────────────────────────────
+  // ─── Availability toggle — A6: wire to API ───────────────
+  const availabilityMutation = useMutation({
+    mutationFn: ({ date, isAvailable, reason }: { date: string; isAvailable: boolean; reason?: string }) =>
+      api.put('/substitutes/availability', { date, isAvailable, reason }),
+    onSuccess: (_, vars) => {
+      setUnavailableDates(prev =>
+        !vars.isAvailable ? [...prev, vars.date] : prev.filter(d => d !== vars.date)
+      );
+      toast.success(!vars.isAvailable ? 'סומנת כלא זמינה' : 'סומנת כזמינה');
+    },
+    onError: () => toast.error('שגיאה בעדכון הזמינות'),
+  });
+
   const toggleAvailability = (dateStr: string) => {
-    // Block if assigned to a kindergarten
     const assignment = allAssignments.find(a => a.assignment_date === dateStr);
     if (assignment) return;
 
@@ -276,12 +303,7 @@ export default function SubstituteDashboard() {
 
     if (!window.confirm(confirmMsg)) return;
 
-    setUnavailableDates(prev =>
-      isCurrentlyUnavailable
-        ? prev.filter(d => d !== dateStr)
-        : [...prev, dateStr]
-    );
-    toast.success(isCurrentlyUnavailable ? 'סומנת כזמינה' : 'סומנת כלא זמינה');
+    availabilityMutation.mutate({ date: dateStr, isAvailable: isCurrentlyUnavailable });
   };
 
   const getDateStatus = (dateStr: string) => {
