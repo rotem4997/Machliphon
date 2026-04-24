@@ -404,6 +404,10 @@ async function main() {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 }
 
-main()
-  .then(() => pool.end())
-  .catch(err => { console.error(err); process.exit(1); });
+export { main as seedFull };
+
+if (require.main === module) {
+  main()
+    .then(() => pool.end())
+    .catch(err => { console.error(err); process.exit(1); });
+}
