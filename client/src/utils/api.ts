@@ -87,18 +87,10 @@ export function handleApiError(err: unknown, context?: string) {
   );
 }
 
-// In dev, Vite proxies /api → localhost:3001 (relative path).
-// In production, call the Render backend directly. Hitting the backend
-// origin bypasses Vercel's rewrite layer (which has been a source of
-// 404s across multiple deploys) — the backend's CORS allow-list includes
-// the Vercel origin via CLIENT_URL / ALLOWED_ORIGINS.
-// Override per-deployment with VITE_API_URL.
-const PRODUCTION_BACKEND = 'https://machliphon-server.onrender.com/api';
-const isLocalhost =
-  typeof window !== 'undefined' &&
-  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-const API_BASE =
-  import.meta.env.VITE_API_URL || (isLocalhost ? '/api' : PRODUCTION_BACKEND);
+// Always use relative /api so the Vercel rewrite proxy handles routing to
+// the backend (server-to-server, no CORS). In dev, Vite proxies instead.
+// Set VITE_API_URL to override for non-Vercel deployments.
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 const api = axios.create({
   baseURL: API_BASE,
