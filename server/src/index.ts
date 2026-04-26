@@ -48,9 +48,20 @@ if (process.env.ALLOWED_ORIGINS) {
   process.env.ALLOWED_ORIGINS.split(',').forEach(o => allowedOrigins.push(o.trim()));
 }
 
+// Vercel preview deployments get unique subdomains; accept any *.vercel.app
+// origin containing "machliphon" so previews don't need per-branch env updates.
+const isMachliphonVercelOrigin = (origin: string) =>
+  /^https:\/\/machliphon[^.]*\.vercel\.app$/.test(origin);
+
 app.use(cors({
   origin: process.env.NODE_ENV === 'production'
-    ? allowedOrigins
+    ? (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin) || isMachliphonVercelOrigin(origin)) {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      }
     : true,
   credentials: true,
 }));

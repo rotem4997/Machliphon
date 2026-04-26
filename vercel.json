@@ -1,32 +1,23 @@
 {
-  "version": 2,
-  "builds": [
+  "buildCommand": "npm install && npm run build --workspace=client",
+  "outputDirectory": "client/dist",
+  "rewrites": [
     {
-      "src": "client/package.json",
-      "use": "@vercel/static-build",
-      "config": { "distDir": "dist" }
+      "source": "/api/:path*",
+      "destination": "https://machliphon-server.onrender.com/api/:path*"
+    },
+    {
+      "source": "/:path*",
+      "destination": "/index.html"
     }
   ],
-  "routes": [
+  "headers": [
     {
-      "src": "/api/(.*)",
-      "dest": "https://machliphon-server.onrender.com/api/$1"
-    },
-    {
-      "src": "/assets/(.*)",
-      "dest": "/assets/$1"
-    },
-    {
-      "src": "/manifest.json",
-      "dest": "/manifest.json"
-    },
-    {
-      "src": "/favicon.svg",
-      "dest": "/favicon.svg"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" }
+      ]
     }
   ]
 }
