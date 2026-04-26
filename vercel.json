@@ -3,11 +3,7 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "https://machliphon-server.onrender.com/api/:path*"
-    },
-    {
-      "source": "/:path*",
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ],
