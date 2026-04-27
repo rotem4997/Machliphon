@@ -215,6 +215,49 @@ CREATE TABLE IF NOT EXISTS madganet_exports (
 );
 
 -- ============================================
+-- ML MODELS (מודלים של למידת מכונה)
+-- One row per (authority, model_kind) holds the latest trained snapshot.
+-- ============================================
+CREATE TABLE IF NOT EXISTS ml_models (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  authority_id UUID REFERENCES authorities(id) ON DELETE CASCADE,
+  kind VARCHAR(50) NOT NULL CHECK (kind IN ('match', 'no_show', 'demand')),
+  -- Serialized weights / parameters (JSON, model-kind specific)
+  params JSONB NOT NULL,
+  -- Metadata for evaluation
+  training_samples INTEGER DEFAULT 0,
+  metric_name VARCHAR(50),         -- e.g. 'auc', 'accuracy', 'mae'
+  metric_value DECIMAL(8,4),
+  feature_names JSONB DEFAULT '[]',
+  trained_at TIMESTAMPTZ DEFAULT NOW(),
+  -- Only one "latest" row per (authority, kind)
+  UNIQUE(authority_id, kind)
+);
+
+-- ============================================
+-- ML PREDICTIONS (תחזיות שנשמרו לבדיקה)
+-- Audit log of predictions made by the system, used for evaluation & feedback.
+-- ============================================
+CREATE TABLE IF NOT EXISTS ml_predictions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  authority_id UUID REFERENCES authorities(id) ON DELETE CASCADE,
+  kind VARCHAR(50) NOT NULL,        -- 'match', 'no_show', 'demand'
+  -- The thing being predicted (one of):
+  subject_type VARCHAR(50) NOT NULL,-- 'substitute', 'assignment', 'kindergarten'
+  subject_id UUID,                   -- nullable for forecasts that aggregate
+  -- Prediction payload
+  score DECIMAL(8,4),                -- 0..1 probability or normalized score
+  details JSONB DEFAULT '{}',        -- model-specific extras (top-K, features used)
+  -- Outcome (filled later via feedback)
+  actual_outcome DECIMAL(8,4),
+  outcome_recorded_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ml_predictions_authority_kind ON ml_predictions(authority_id, kind);
+CREATE INDEX IF NOT EXISTS idx_ml_predictions_subject ON ml_predictions(subject_type, subject_id);
+
+-- ============================================
 -- INDEXES for performance
 -- ============================================
 CREATE INDEX IF NOT EXISTS idx_users_authority ON users(authority_id);
