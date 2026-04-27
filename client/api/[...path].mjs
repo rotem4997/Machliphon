@@ -13,6 +13,9 @@ export default async function handler(req, res) {
   const qIdx = req.url.indexOf('?');
   const qs = qIdx >= 0 ? req.url.slice(qIdx) : '';
 
+  console.log(`[proxy] ▶ ${req.method} /api/${pathStr}${qs}`);
+  console.log(`[proxy] PRIMARY=${PRIMARY_BACKEND} FALLBACK=${FALLBACK_BACKEND}`);
+
   const headers = {};
   if (req.headers['content-type'])  headers['content-type']  = req.headers['content-type'];
   if (req.headers['authorization']) headers['authorization'] = req.headers['authorization'];
@@ -25,9 +28,9 @@ export default async function handler(req, res) {
 
   const tryUrl = async (base) => {
     const target = `${base}/api/${pathStr}${qs}`;
-    console.log(`[proxy] ${req.method} ${target}`);
+    console.log(`[proxy] → fetch ${req.method} ${target}`);
     const upstream = await fetch(target, init);
-    console.log(`[proxy] ${target} -> ${upstream.status}`);
+    console.log(`[proxy] ← ${target} status=${upstream.status}`);
     return upstream;
   };
 
@@ -35,23 +38,25 @@ export default async function handler(req, res) {
   let triedFallback = false;
   try {
     upstream = await tryUrl(PRIMARY_BACKEND);
-    // If primary returns 404 from Render's host wildcard ("Host not in allowlist"
-    // / "Application not found"), try the fallback.
-    if (upstream.status === 404 || upstream.status === 403) {
-      const peek = await upstream.clone().text();
-      if (/host not in allowlist|application not found|no service/i.test(peek)) {
-        console.log(`[proxy] primary returned ${upstream.status} wildcard, trying fallback`);
-        triedFallback = true;
-        upstream = await tryUrl(FALLBACK_BACKEND);
-      }
+
+    // Fall back if primary returns a host-level failure (4xx/5xx that indicates
+    // the service isn't reachable, not a legitimate app-level error).
+    // We do NOT body-match any more — any 404/403/502/503/504 from the primary
+    // means "wrong host or service down"; try the fallback instead.
+    if (upstream.status === 404 || upstream.status === 403 ||
+        upstream.status === 502 || upstream.status === 503 || upstream.status === 504) {
+      const snippet = await upstream.clone().text().then(t => t.slice(0, 300)).catch(() => '');
+      console.log(`[proxy] primary ${upstream.status} → switching to fallback. body snippet: ${snippet}`);
+      triedFallback = true;
+      upstream = await tryUrl(FALLBACK_BACKEND);
     }
   } catch (err) {
-    console.error(`[proxy] PRIMARY error:`, err.message);
+    console.error(`[proxy] PRIMARY fetch error: ${err.message}`);
     try {
       triedFallback = true;
       upstream = await tryUrl(FALLBACK_BACKEND);
     } catch (err2) {
-      console.error(`[proxy] FALLBACK error:`, err2.message);
+      console.error(`[proxy] FALLBACK fetch error: ${err2.message}`);
       res.status(502).json({
         error: 'בעיית חיבור לשרת. נסה שנית.',
         debug: { primary: err.message, fallback: err2.message },
@@ -60,11 +65,14 @@ export default async function handler(req, res) {
     }
   }
 
+  console.log(`[proxy] ✓ responding with status=${upstream.status} backend=${triedFallback ? FALLBACK_BACKEND : PRIMARY_BACKEND}`);
+
   const buffer = await upstream.arrayBuffer();
   const ct = upstream.headers.get('content-type');
 
   res.status(upstream.status);
   if (ct) res.setHeader('content-type', ct);
   res.setHeader('x-proxy-backend', triedFallback ? FALLBACK_BACKEND : PRIMARY_BACKEND);
+  res.setHeader('x-proxy-path', `/api/${pathStr}`);
   res.send(Buffer.from(buffer));
 }
