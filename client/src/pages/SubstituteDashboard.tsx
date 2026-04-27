@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  CheckCircle, XCircle, Calendar, MapPin, Clock, AlertCircle,
+  CheckCircle, XCircle, Calendar, MapPin, Clock,
   ChevronRight, ChevronLeft, Camera, Edit3, List, LayoutGrid, Save, X,
+  Sparkles, Building2,
 } from 'lucide-react';
 import api, { handleApiError } from '@/utils/api';
 import { useAuthStore } from '@/context/authStore';
@@ -10,6 +11,8 @@ import toast from 'react-hot-toast';
 import { format, parseISO, startOfWeek, addDays, addWeeks, addMonths, subWeeks, subMonths, isSameDay, isSameMonth } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { isHoliday } from '@/utils/holidays';
+import { MOCK_KINDERGARTENS, MOCK_BASE_ASSIGNMENTS } from '@/utils/mockData';
+import { useMockHolesStore } from '@/context/mockHolesStore';
 
 interface Assignment {
   id: string;
@@ -162,6 +165,12 @@ export default function SubstituteDashboard() {
   const [unavailableDates, setUnavailableDates] = useState<string[]>(MOCK_UNAVAILABLE_DATES);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Suggestions: assignments the sub grabbed locally (mirrors what the manager sees as "taken")
+  const [myTakenAssignments, setMyTakenAssignments] = useState<Assignment[]>([]);
+  const takeHoleStore = useMockHolesStore(s => s.takeHole);
+  const isHoleTaken = useMockHolesStore(s => s.isHoleTaken);
+  const takenHoles = useMockHolesStore(s => s.takenHoles);
+
   // Profile edit state
   const [profileForm, setProfileForm] = useState({
     first_name: MOCK_PROFILE.first_name,
@@ -220,11 +229,78 @@ export default function SubstituteDashboard() {
     work_permit_expiry: '2027-01-01',
     total_assignments: 0,
   } : MOCK_PROFILE);
-  const allAssignments = MOCK_ASSIGNMENTS.map(a =>
-    mockStatusOverrides[a.id] ? { ...a, status: mockStatusOverrides[a.id] } : a
-  );
+  const allAssignments = [
+    ...MOCK_ASSIGNMENTS.map(a =>
+      mockStatusOverrides[a.id] ? { ...a, status: mockStatusOverrides[a.id] } : a
+    ),
+    ...myTakenAssignments,
+  ];
   const selectedDayStr = format(selectedDay, 'yyyy-MM-dd');
   const selectedDayAsgn = todayAssignment ?? allAssignments.find(a => a.assignment_date === selectedDayStr) ?? null;
+
+  // ─── Compute open suggestions (holes from manager view minus already-taken) ─────
+  const suggestions = useMemo(() => {
+    const out: { date: string; dateObj: Date; kgId: string; kgName: string; kgAddress: string; neighborhood: string; }[] = [];
+    // Look ahead 14 working days
+    for (let offset = 0; offset < 21 && out.length < 8; offset++) {
+      const day = addDays(today, offset);
+      if (day.getDay() === 6) continue; // skip Saturday
+      const dateStr = format(day, 'yyyy-MM-dd');
+      if (isHoliday(dateStr)) continue;
+      if (unavailableDates.includes(dateStr)) continue;
+      // Skip days where the sub already has an assignment
+      if (allAssignments.some(a => a.assignment_date === dateStr)) continue;
+
+      const dayBaseAsgns = MOCK_BASE_ASSIGNMENTS.filter(a => a.assignment_date === dateStr);
+      const coveredKgIds = new Set(dayBaseAsgns.map(a => a.kindergarten_id));
+      MOCK_KINDERGARTENS.forEach(kg => {
+        if (coveredKgIds.has(kg.id)) return;
+        if (isHoleTaken(dateStr, kg.id)) return;
+        out.push({
+          date: dateStr,
+          dateObj: day,
+          kgId: kg.id,
+          kgName: kg.name,
+          kgAddress: kg.address,
+          neighborhood: kg.neighborhood,
+        });
+      });
+    }
+    return out.slice(0, 5);
+    // takenHoles is in deps so suggestions re-render when any user takes a hole
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unavailableDates, myTakenAssignments, takenHoles, todayStr]);
+
+  const handleTakeSuggestion = (s: typeof suggestions[number]) => {
+    if (!window.confirm(`לקחת שיבוץ ל${s.kgName} בתאריך ${format(s.dateObj, 'd/M/yyyy')}?`)) return;
+    // Update cross-role store so manager view drops the hole
+    takeHoleStore({
+      date: s.date,
+      kgId: s.kgId,
+      kgName: s.kgName,
+      kgAddress: s.kgAddress,
+      neighborhood: s.neighborhood,
+      subFirstName: profileForm.first_name || p.first_name || 'מחליפה',
+      subLastName: profileForm.last_name || p.last_name || '',
+      subPhone: profileForm.phone || p.phone || '',
+    });
+    // Add the assignment to the substitute's own list
+    const newAsgn: Assignment = {
+      id: `taken-${s.date}-${s.kgId}`,
+      assignment_date: s.date,
+      start_time: '07:30',
+      end_time: '14:00',
+      kindergarten_name: s.kgName,
+      kindergarten_address: s.kgAddress,
+      neighborhood: s.neighborhood,
+      status: 'confirmed',
+    };
+    setMyTakenAssignments(prev => [...prev, newAsgn]);
+    toast.success(`קיבלת שיבוץ ל${s.kgName}!`);
+    // Switch the calendar to the day she just took
+    setSelectedDay(s.dateObj);
+    setCurrentDate(s.dateObj);
+  };
 
   const confirmAssignment = useMutation({
     mutationFn: async (id: string) => {
@@ -257,9 +333,21 @@ export default function SubstituteDashboard() {
     onError: (err) => handleApiError(err, 'markArrived'),
   });
 
-  // B4: Substitute cancel
+  // Substitute cancel — also reverses cross-role state for taken-hole assignments
+  const untakeHoleStore = useMockHolesStore(s => s.untakeHole);
   const cancelAssignment = useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
+      if (id.startsWith('taken-')) {
+        // Format: taken-<date>-<kgId>
+        const taken = myTakenAssignments.find(a => a.id === id);
+        if (taken) {
+          // Recover kgId by lookup against MOCK_KINDERGARTENS
+          const kg = MOCK_KINDERGARTENS.find(k => k.name === taken.kindergarten_name);
+          if (kg) untakeHoleStore(taken.assignment_date, kg.id);
+        }
+        setMyTakenAssignments(prev => prev.filter(a => a.id !== id));
+        return {};
+      }
       if (id.startsWith('mock-')) {
         setMockStatusOverrides(prev => ({ ...prev, [id]: 'cancelled' }));
         return {};
@@ -421,7 +509,12 @@ export default function SubstituteDashboard() {
                     אני מגיעה ✓
                   </button>
                   <button
-                    onClick={() => toast.error('פנה/י למדריכה לביטול')}
+                    onClick={() => {
+                      const reason = window.prompt('סיבת הביטול (אופציונלי):') ?? '';
+                      if (!window.confirm('לבטל את השיבוץ?')) return;
+                      cancelAssignment.mutate({ id: selectedDayAsgn.id, reason });
+                    }}
+                    disabled={cancelAssignment.isPending}
                     className="btn-secondary flex items-center justify-center gap-2 py-4 text-base text-red-500 border-red-200"
                   >
                     <XCircle size={20} />
@@ -469,6 +562,68 @@ export default function SubstituteDashboard() {
                   )}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ═══ Suggestions: open holes the sub can grab ═══ */}
+          {suggestions.length > 0 && (
+            <div className="card p-5 border-2 border-mint-200 bg-gradient-to-br from-mint-50/50 to-white">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-lg bg-mint-100 flex items-center justify-center">
+                  <Sparkles size={16} className="text-mint-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-bold text-navy-900">הצעות שיבוץ פתוחות</h3>
+                  <p className="text-xs text-slate-500">גנים זקוקים למחליפה — לחצי כדי לקחת שיבוץ</p>
+                </div>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-mint-500 text-white font-bold">
+                  {suggestions.length}
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                {suggestions.map(s => (
+                  <div
+                    key={`${s.date}_${s.kgId}`}
+                    className="flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-100 hover:border-mint-300 transition-colors"
+                  >
+                    {/* Date badge */}
+                    <div className="text-center rounded-lg px-2.5 py-1.5 min-w-[52px] bg-navy-900">
+                      <p className="text-xs font-bold text-mint-400">
+                        {format(s.dateObj, 'EEE', { locale: he })}
+                      </p>
+                      <p className="text-sm font-bold text-white">
+                        {format(s.dateObj, 'd/M')}
+                      </p>
+                    </div>
+
+                    {/* KG details */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-navy-900 flex items-center gap-1.5">
+                        <Building2 size={13} className="text-slate-400" />
+                        {s.kgName}
+                      </p>
+                      <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                        <MapPin size={11} />
+                        {s.kgAddress} · {s.neighborhood}
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
+                        <Clock size={10} />
+                        07:30 — 14:00
+                      </p>
+                    </div>
+
+                    {/* Take button */}
+                    <button
+                      onClick={() => handleTakeSuggestion(s)}
+                      className="btn-primary text-xs py-2 px-3 flex items-center gap-1 flex-shrink-0"
+                    >
+                      <CheckCircle size={13} />
+                      קחי
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
