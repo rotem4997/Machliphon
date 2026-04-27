@@ -87,14 +87,16 @@ export function handleApiError(err: unknown, context?: string) {
   );
 }
 
-// Always use relative /api — in dev Vite proxies to localhost:3001,
-// in production Vercel routes /api/* to the backend via vercel.json.
-// Set VITE_API_URL only for non-Vercel custom deployments.
+// Always use relative /api so the Vercel rewrite proxy handles routing to
+// the backend (server-to-server, no CORS). In dev, Vite proxies instead.
+// Set VITE_API_URL to override for non-Vercel deployments.
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
+// 60s accommodates Render free-tier cold starts (~30-60s) so the first
+// request after the backend goes to sleep doesn't time out.
 const api = axios.create({
   baseURL: API_BASE,
-  timeout: 15000,
+  timeout: 60000,
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -112,27 +114,59 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Handle 401 - refresh or logout
+// Handle 401 — try to refresh the access token, but only logout if the refresh
+// itself returns 401 (token actually invalid). Network errors / timeouts during
+// refresh must NOT wipe the user's auth, otherwise a single hiccup logs them out
+// and they end up back at /login while their tokens are still good.
+//
+// Also, never run the refresh flow for the login or refresh endpoints
+// themselves — login 401 is "wrong credentials", refresh 401 is "session over".
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    const url: string = originalRequest?.url || '';
+    const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/refresh');
+
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
+
+      const stored = localStorage.getItem('machliphon-auth');
+      if (!stored) {
+        return Promise.reject(error);
+      }
+
+      let parsed: { state?: { refreshToken?: string; token?: string } };
       try {
-        const stored = localStorage.getItem('machliphon-auth');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (parsed.state?.refreshToken) {
-            const { data } = await axios.post(`${API_BASE}/auth/refresh`, { refreshToken: parsed.state.refreshToken });
-            parsed.state.token = data.token;
-            localStorage.setItem('machliphon-auth', JSON.stringify(parsed));
-            originalRequest.headers.Authorization = `Bearer ${data.token}`;
-            return api(originalRequest);
-          }
+        parsed = JSON.parse(stored);
+      } catch {
+        return Promise.reject(error);
+      }
+      if (!parsed.state?.refreshToken) {
+        return Promise.reject(error);
+      }
+
+      try {
+        const { data } = await axios.post(
+          `${API_BASE}/auth/refresh`,
+          { refreshToken: parsed.state.refreshToken },
+          { timeout: 60000 },
+        );
+        parsed.state.token = data.token;
+        localStorage.setItem('machliphon-auth', JSON.stringify(parsed));
+        originalRequest.headers.Authorization = `Bearer ${data.token}`;
+        return api(originalRequest);
+      } catch (refreshErr: unknown) {
+        // Only clear auth if the refresh endpoint itself rejected the token.
+        // Network errors / timeouts leave auth intact so the user can retry.
+        const refreshStatus = axios.isAxiosError(refreshErr)
+          ? refreshErr.response?.status
+          : undefined;
+        if (refreshStatus === 401 || refreshStatus === 403) {
+          localStorage.removeItem('machliphon-auth');
         }
-      } catch {}
-      localStorage.removeItem('machliphon-auth');
+        return Promise.reject(error);
+      }
     }
     return Promise.reject(error);
   }
