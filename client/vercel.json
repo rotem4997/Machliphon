@@ -3,16 +3,14 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://machliphon.onrender.com/api/:path*"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ],
-  "functions": {
-    "api/[...path].mjs": {
-      "memory": 256,
-      "maxDuration": 60
-    }
-  },
   "headers": [
     {
       "source": "/(.*)",
