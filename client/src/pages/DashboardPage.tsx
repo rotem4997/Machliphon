@@ -1,125 +1,27 @@
 import { useState, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import {
   Calendar, AlertTriangle, ChevronRight, ChevronLeft, Plus, X,
-  MapPin, Clock, User, LayoutGrid, List, CheckCircle, Phone,
+  Clock, User, LayoutGrid, List, CheckCircle, Phone,
 } from 'lucide-react';
-import api, { handleApiError } from '@/utils/api';
-import { useAuthStore } from '@/context/authStore';
+import api from '@/utils/api';
 import toast from 'react-hot-toast';
 import {
   format, parseISO, startOfWeek, addDays, addWeeks, subWeeks,
   addMonths, subMonths, isSameDay, isSameMonth, isToday,
 } from 'date-fns';
 import { he } from 'date-fns/locale';
-import { isHoliday, Holiday } from '@/utils/holidays';
+import { isHoliday } from '@/utils/holidays';
+import {
+  MOCK_KINDERGARTENS, MOCK_20_SUBS, MOCK_BASE_ASSIGNMENTS,
+  MockKindergarten, MockAssignment, MockSub,
+} from '@/utils/mockData';
+import { useMockHolesStore } from '@/context/mockHolesStore';
 
-// ─── Types ──────────────────────────────────────────────────
-
-interface Kindergarten {
-  id: string;
-  name: string;
-  address: string;
-  neighborhood: string;
-  age_group: string;
-}
-
-interface Assignment {
-  id: string;
-  assignment_date: string;
-  start_time: string;
-  end_time: string;
-  status: string;
-  kindergarten_id: string;
-  kindergarten_name: string;
-  kindergarten_address: string;
-  neighborhood: string;
-  substitute_first_name: string;
-  substitute_last_name: string;
-  substitute_phone: string;
-  notes: string | null;
-}
-
-interface AvailableSub {
-  id: string;
-  first_name: string;
-  last_name: string;
-  phone: string;
-  neighborhood: string;
-  education_level: string;
-  years_experience: number;
-  total_assignments: number;
-}
-
-// ─── Mock data ──────────────────────────────────────────────
-
-const MOCK_KINDERGARTENS: Kindergarten[] = [
-  { id: 'kg-1', name: 'גן חבצלת', address: 'רחוב הרצל 15', neighborhood: 'מרכז', age_group: 'גן ילדים' },
-  { id: 'kg-2', name: 'גן נרקיס', address: 'רחוב ויצמן 8', neighborhood: 'צפון', age_group: 'גן ילדים' },
-  { id: 'kg-3', name: 'גן רקפת', address: 'שדרות בן גוריון 22', neighborhood: 'דרום', age_group: 'טרום חובה' },
-  { id: 'kg-4', name: 'גן כלנית', address: 'רחוב סוקולוב 3', neighborhood: 'מרכז', age_group: 'גן ילדים' },
-  { id: 'kg-5', name: 'גן דליה', address: 'רחוב ז׳בוטינסקי 11', neighborhood: 'מזרח', age_group: 'טרום חובה' },
-];
-
-const MOCK_AVAILABLE_SUBS: AvailableSub[] = [
-  { id: 'sub-1', first_name: 'מרים', last_name: 'אברהם', phone: '054-1234567', neighborhood: 'מרכז', education_level: 'תואר ראשון', years_experience: 3, total_assignments: 24 },
-  { id: 'sub-2', first_name: 'רחל', last_name: 'לוי', phone: '052-9876543', neighborhood: 'צפון', education_level: 'תואר שני', years_experience: 5, total_assignments: 42 },
-  { id: 'sub-3', first_name: 'שרה', last_name: 'כהן', phone: '050-5551234', neighborhood: 'דרום', education_level: 'סמינר', years_experience: 2, total_assignments: 15 },
-  { id: 'sub-4', first_name: 'לאה', last_name: 'דוד', phone: '053-7778899', neighborhood: 'מזרח', education_level: 'תואר ראשון', years_experience: 4, total_assignments: 31 },
-];
-
-function generateMockAssignments(): Assignment[] {
-  const today = new Date();
-  const assignments: Assignment[] = [];
-  const kgs = MOCK_KINDERGARTENS;
-  const subs = MOCK_AVAILABLE_SUBS;
-
-  // Deterministic pseudo-random based on day offset for consistent display
-  // Some days are fully covered, others have 1-2 holes
-  for (let dayOffset = -5; dayOffset <= 20; dayOffset++) {
-    const date = addDays(today, dayOffset);
-    if (date.getDay() === 6) continue; // Skip Saturday
-    const dateStr = format(date, 'yyyy-MM-dd');
-    if (isHoliday(dateStr)) continue;
-
-    const usedSubIds = new Set<string>();
-
-    // Decide which pattern this day gets:
-    // ~40% of days = fully covered, ~40% have 1 hole, ~20% have 2 holes
-    const seed = Math.abs(dayOffset * 7 + 3);
-    const pattern = seed % 5; // 0,1 = full; 2,3 = 1 hole; 4 = 2 holes
-    const holeCount = pattern <= 1 ? 0 : pattern <= 3 ? 1 : 2;
-
-    // Pick which kindergarten indices will have holes
-    const holeIndices = new Set<number>();
-    if (holeCount >= 1) holeIndices.add(seed % kgs.length);
-    if (holeCount >= 2) holeIndices.add((seed + 2) % kgs.length);
-
-    kgs.forEach((kg, ki) => {
-      if (holeIndices.has(ki)) return; // This kg has a hole today
-      const availSub = subs.find(s => !usedSubIds.has(s.id)) || subs[ki % subs.length];
-      usedSubIds.add(availSub.id);
-      assignments.push({
-        id: `mock-asgn-${dateStr}-${kg.id}`,
-        assignment_date: dateStr,
-        start_time: '07:30',
-        end_time: '14:00',
-        status: dayOffset < 0 ? 'completed' : dayOffset === 0 ? 'confirmed' : 'pending',
-        kindergarten_id: kg.id,
-        kindergarten_name: kg.name,
-        kindergarten_address: kg.address,
-        neighborhood: kg.neighborhood,
-        substitute_first_name: availSub.first_name,
-        substitute_last_name: availSub.last_name,
-        substitute_phone: availSub.phone,
-        notes: null,
-      });
-    });
-  }
-  return assignments;
-}
-
-const MOCK_ASSIGNMENTS = generateMockAssignments();
+// Local aliases (this file used these names previously)
+type Kindergarten = MockKindergarten;
+type Assignment = MockAssignment;
+type AvailableSub = MockSub;
 
 type ViewMode = 'week' | 'month' | 'list';
 
@@ -136,8 +38,6 @@ const statusConfig: Record<string, { label: string; cls: string }> = {
 // ─── Main Component ─────────────────────────────────────────
 
 export default function DashboardPage() {
-  const { user } = useAuthStore();
-  const queryClient = useQueryClient();
   const today = new Date();
 
   // ─── State ─────────────────────────────────────────────
@@ -147,8 +47,11 @@ export default function DashboardPage() {
   const [assignModal, setAssignModal] = useState<{ kindergartenId: string; date: string } | null>(null);
   const [localAssignments, setLocalAssignments] = useState<Assignment[]>([]);
 
+  // Cross-role taken holes (substitute-grabbed assignments) — drives logic QA
+  const takenAsAssignments = useMockHolesStore(s => s.getTakenAsAssignments());
+
   // ─── Queries ───────────────────────────────────────────
-  const { data: kindergartens } = useQuery<Kindergarten[]>({
+  useQuery<Kindergarten[]>({
     queryKey: ['kindergartens'],
     queryFn: () => api.get('/kindergartens').then(r => r.data),
   });
@@ -156,8 +59,12 @@ export default function DashboardPage() {
   // Always use mock kindergartens since assignments are mock data
   const kgs = MOCK_KINDERGARTENS;
 
-  // All assignments for the visible range
-  const allAssignments = useMemo(() => [...MOCK_ASSIGNMENTS, ...localAssignments], [localAssignments]);
+  // All assignments for the visible range:
+  // base mock + manager's manual local assignments + holes taken by substitutes (cross-role)
+  const allAssignments = useMemo(
+    () => [...MOCK_BASE_ASSIGNMENTS, ...localAssignments, ...takenAsAssignments],
+    [localAssignments, takenAsAssignments],
+  );
 
   const selectedDayStr = format(selectedDay, 'yyyy-MM-dd');
   const holiday = isHoliday(selectedDayStr);
@@ -217,7 +124,7 @@ export default function DashboardPage() {
   // ─── Mock assign handler ───────────────────────────────
   const handleAssign = (kindergartenId: string, substituteId: string, date: string) => {
     const kg = kgs.find(k => k.id === kindergartenId)!;
-    const sub = MOCK_AVAILABLE_SUBS.find(s => s.id === substituteId)!;
+    const sub = MOCK_20_SUBS.find(s => s.id === substituteId)!;
     const newAssignment: Assignment = {
       id: `local-${Date.now()}`,
       assignment_date: date,
@@ -598,7 +505,7 @@ export default function DashboardPage() {
         // Filter out subs already assigned on this date
         const dateAsgns = allAssignments.filter(a => a.assignment_date === assignModal.date);
         const assignedSubNames = new Set(dateAsgns.map(a => `${a.substitute_first_name} ${a.substitute_last_name}`));
-        const freeSubs = MOCK_AVAILABLE_SUBS.filter(s => !assignedSubNames.has(`${s.first_name} ${s.last_name}`));
+        const freeSubs = MOCK_20_SUBS.filter(s => !assignedSubNames.has(`${s.first_name} ${s.last_name}`));
         return (
           <AssignModal
             kindergartenId={assignModal.kindergartenId}
