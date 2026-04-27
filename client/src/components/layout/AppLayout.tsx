@@ -1,7 +1,8 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Calendar, ClipboardList,
-  BarChart3, Settings, LogOut, Bell, Menu, X, Activity
+  BarChart3, Settings, LogOut, Bell, Menu, X, Activity,
+  CalendarCheck, Building2, BookOpen,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuthStore, UserRole } from '@/context/authStore';
@@ -13,7 +14,9 @@ const navItems: Record<UserRole, { href: string; label: string; icon: React.Reac
     { href: '/activity', label: 'פעילות חיה', icon: <Activity size={18} /> },
     { href: '/substitutes', label: 'מחליפות', icon: <Users size={18} /> },
     { href: '/absences', label: 'היעדרויות', icon: <ClipboardList size={18} /> },
-    { href: '/reports', label: 'דוחות ומדגנט', icon: <BarChart3 size={18} /> },
+    { href: '/known-absences', label: 'היעדרויות ידועות', icon: <BookOpen size={18} /> },
+    { href: '/manager-kindergartens', label: 'מנהלי גנים', icon: <Building2 size={18} /> },
+    { href: '/reports', label: 'דוחות', icon: <BarChart3 size={18} /> },
     { href: '/settings', label: 'הגדרות', icon: <Settings size={18} /> },
     { href: '/profile', label: 'פרופיל', icon: <Users size={18} /> },
   ],
@@ -22,17 +25,20 @@ const navItems: Record<UserRole, { href: string; label: string; icon: React.Reac
     { href: '/activity', label: 'פעילות חיה', icon: <Activity size={18} /> },
     { href: '/substitutes', label: 'מחליפות', icon: <Users size={18} /> },
     { href: '/absences', label: 'היעדרויות', icon: <ClipboardList size={18} /> },
+    { href: '/known-absences', label: 'היעדרויות ידועות', icon: <BookOpen size={18} /> },
     { href: '/reports', label: 'דוחות', icon: <BarChart3 size={18} /> },
     { href: '/profile', label: 'פרופיל', icon: <Users size={18} /> },
   ],
   substitute: [
     { href: '/dashboard', label: 'שיבוצים שלי', icon: <Calendar size={18} /> },
+    { href: '/availability', label: 'זמינות', icon: <CalendarCheck size={18} /> },
     { href: '/profile', label: 'פרופיל', icon: <Settings size={18} /> },
   ],
   super_admin: [
     { href: '/dashboard', label: 'לוח בקרה', icon: <LayoutDashboard size={18} /> },
     { href: '/authorities', label: 'רשויות', icon: <BarChart3 size={18} /> },
     { href: '/substitutes', label: 'מחליפות', icon: <Users size={18} /> },
+    { href: '/known-absences', label: 'היעדרויות ידועות', icon: <BookOpen size={18} /> },
     { href: '/settings', label: 'הגדרות', icon: <Settings size={18} /> },
   ],
 };
