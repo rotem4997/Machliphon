@@ -299,8 +299,8 @@ async function main() {
         (absence_id, substitute_id, kindergarten_id, assigned_by, assignment_date,
          start_time, end_time, status, hours_worked, hourly_rate, total_pay,
          substitute_confirmed_at, substitute_arrived_at)
-      VALUES ($1,$2,$3,$4,$5,'07:30','14:00',$6,$7,$8,$9,NOW(),
-        CASE WHEN $6 IN ('arrived','completed') THEN NOW() ELSE NULL END)
+      VALUES ($1,$2,$3,$4,$5,'07:30','14:00',$6::varchar,$7,$8,$9,NOW(),
+        CASE WHEN $6::varchar IN ('arrived','completed') THEN NOW() ELSE NULL END)
     `, [
       absenceIds[a.absIdx],
       subIds[a.subIdx],

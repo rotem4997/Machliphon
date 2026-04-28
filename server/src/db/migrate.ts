@@ -34,11 +34,20 @@ export async function runMigrations() {
   // Add teaching_license_url column if missing
   await query(`ALTER TABLE substitutes ADD COLUMN IF NOT EXISTS teaching_license_url VARCHAR(500)`).catch(() => {});
 
-  // Seed if no users exist
+  // Seed if no users exist. Prefer the rich seed (10 substitutes, 20
+  // kindergartens, real assignments + absences) so the dashboard and ML
+  // models have realistic data from day one. Fall back to the minimal
+  // demo seed if the rich seed fails for any reason.
   const users = await query('SELECT COUNT(*)::int AS count FROM users');
   if (users.rows[0].count === 0) {
-    console.log('🌱 Seeding demo data...');
-    await seedData();
+    console.log('🌱 Seeding demo data (full)...');
+    try {
+      const { seedFull } = await import('./seed-full');
+      await seedFull();
+    } catch (err) {
+      console.error('⚠️  Full seed failed, falling back to minimal demo seed:', err);
+      await seedData();
+    }
   } else {
     console.log('ℹ️  Data already exists, skipping seed');
   }

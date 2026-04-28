@@ -16,6 +16,7 @@ import notificationsRoutes from './routes/notifications';
 import activityRoutes from './routes/activity';
 import knownAbsencesRoutes from './routes/known-absences';
 import managerKindergartensRoutes from './routes/manager-kindergartens';
+import mlRoutes from './routes/ml';
 import { requestIdMiddleware } from './middleware/requestId';
 import { errorHandler } from './middleware/errorHandler';
 
@@ -125,6 +126,7 @@ app.use('/api/notifications', notificationsRoutes);
 app.use('/api/activity', activityRoutes);
 app.use('/api/known-absences', knownAbsencesRoutes);
 app.use('/api/manager-kindergartens', managerKindergartensRoutes);
+app.use('/api/ml', mlRoutes);
 
 // ── Serve frontend in production ─────────────────────────────
 if (process.env.NODE_ENV === 'production') {
