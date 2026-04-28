@@ -12,9 +12,36 @@ import pool from './pool';
 
 const DEFAULT_PASSWORD = 'Demo1234!';
 
+// All emails owned by the full demo seed. Exposed so migrate.ts can
+// force-reset their passwords on every boot — guarantees the documented
+// "Demo1234!" credentials always work, even if an earlier (possibly broken)
+// seed wrote a bad hash.
+export const DEMO_EMAILS = [
+  'admin@negev.gov.il',
+  'manager1@negev.gov.il',
+  'manager2@negev.gov.il',
+  'sarah.cohen@demo.il', 'mira.levi@demo.il', 'rina.aven@demo.il',
+  'dana.shapir@demo.il', 'noa.bar@demo.il', 'orit.david@demo.il',
+  'yael.barak@demo.il', 'hana.mizrahi@demo.il', 'liat.friedman@demo.il',
+  'galit.sagi@demo.il',
+];
+
+export async function resetDemoPasswords() {
+  const hash = await bcrypt.hash(DEFAULT_PASSWORD, 12);
+  const reset = await query(
+    `UPDATE users SET password_hash = $1 WHERE email = ANY($2::text[])`,
+    [hash, DEMO_EMAILS],
+  );
+  if ((reset.rowCount ?? 0) > 0) {
+    console.log(`🔑 Reset password for ${reset.rowCount} demo account(s) → ${DEFAULT_PASSWORD}`);
+  }
+  return reset.rowCount ?? 0;
+}
+
 async function main() {
   const hash = await bcrypt.hash(DEFAULT_PASSWORD, 12);
   console.log('🌱  Starting full seed...');
+  await resetDemoPasswords();
 
   // ──────────────────────────────────────────────
   // AUTHORITY
