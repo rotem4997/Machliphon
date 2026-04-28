@@ -2,17 +2,16 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Calendar, AlertTriangle, ChevronRight, ChevronLeft, Plus, X,
-  MapPin, Clock, User, LayoutGrid, List, CheckCircle, Phone,
+  Clock, User, LayoutGrid, List, CheckCircle, Phone, Sparkles,
 } from 'lucide-react';
 import api, { handleApiError } from '@/utils/api';
-import { useAuthStore } from '@/context/authStore';
 import toast from 'react-hot-toast';
 import {
   format, parseISO, startOfWeek, addDays, addWeeks, subWeeks,
   addMonths, subMonths, isSameDay, isSameMonth, isToday,
 } from 'date-fns';
 import { he } from 'date-fns/locale';
-import { isHoliday, Holiday } from '@/utils/holidays';
+import { isHoliday } from '@/utils/holidays';
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -40,86 +39,26 @@ interface Assignment {
   notes: string | null;
 }
 
-interface AvailableSub {
+interface AbsenceReport {
   id: string;
-  first_name: string;
-  last_name: string;
-  phone: string;
-  neighborhood: string;
-  education_level: string;
-  years_experience: number;
-  total_assignments: number;
+  kindergarten_id: string;
+  kindergarten_name: string;
+  kindergarten_address: string;
+  absent_employee_name: string;
+  absent_employee_role: string;
+  absence_date: string;
+  absence_reason: string | null;
+  status: 'open' | 'assigned' | 'covered' | 'uncovered';
 }
 
-// ─── Mock data ──────────────────────────────────────────────
-
-const MOCK_KINDERGARTENS: Kindergarten[] = [
-  { id: 'kg-1', name: 'גן חבצלת', address: 'רחוב הרצל 15', neighborhood: 'מרכז', age_group: 'גן ילדים' },
-  { id: 'kg-2', name: 'גן נרקיס', address: 'רחוב ויצמן 8', neighborhood: 'צפון', age_group: 'גן ילדים' },
-  { id: 'kg-3', name: 'גן רקפת', address: 'שדרות בן גוריון 22', neighborhood: 'דרום', age_group: 'טרום חובה' },
-  { id: 'kg-4', name: 'גן כלנית', address: 'רחוב סוקולוב 3', neighborhood: 'מרכז', age_group: 'גן ילדים' },
-  { id: 'kg-5', name: 'גן דליה', address: 'רחוב ז׳בוטינסקי 11', neighborhood: 'מזרח', age_group: 'טרום חובה' },
-];
-
-const MOCK_AVAILABLE_SUBS: AvailableSub[] = [
-  { id: 'sub-1', first_name: 'מרים', last_name: 'אברהם', phone: '054-1234567', neighborhood: 'מרכז', education_level: 'תואר ראשון', years_experience: 3, total_assignments: 24 },
-  { id: 'sub-2', first_name: 'רחל', last_name: 'לוי', phone: '052-9876543', neighborhood: 'צפון', education_level: 'תואר שני', years_experience: 5, total_assignments: 42 },
-  { id: 'sub-3', first_name: 'שרה', last_name: 'כהן', phone: '050-5551234', neighborhood: 'דרום', education_level: 'סמינר', years_experience: 2, total_assignments: 15 },
-  { id: 'sub-4', first_name: 'לאה', last_name: 'דוד', phone: '053-7778899', neighborhood: 'מזרח', education_level: 'תואר ראשון', years_experience: 4, total_assignments: 31 },
-];
-
-function generateMockAssignments(): Assignment[] {
-  const today = new Date();
-  const assignments: Assignment[] = [];
-  const kgs = MOCK_KINDERGARTENS;
-  const subs = MOCK_AVAILABLE_SUBS;
-
-  // Deterministic pseudo-random based on day offset for consistent display
-  // Some days are fully covered, others have 1-2 holes
-  for (let dayOffset = -5; dayOffset <= 20; dayOffset++) {
-    const date = addDays(today, dayOffset);
-    if (date.getDay() === 6) continue; // Skip Saturday
-    const dateStr = format(date, 'yyyy-MM-dd');
-    if (isHoliday(dateStr)) continue;
-
-    const usedSubIds = new Set<string>();
-
-    // Decide which pattern this day gets:
-    // ~40% of days = fully covered, ~40% have 1 hole, ~20% have 2 holes
-    const seed = Math.abs(dayOffset * 7 + 3);
-    const pattern = seed % 5; // 0,1 = full; 2,3 = 1 hole; 4 = 2 holes
-    const holeCount = pattern <= 1 ? 0 : pattern <= 3 ? 1 : 2;
-
-    // Pick which kindergarten indices will have holes
-    const holeIndices = new Set<number>();
-    if (holeCount >= 1) holeIndices.add(seed % kgs.length);
-    if (holeCount >= 2) holeIndices.add((seed + 2) % kgs.length);
-
-    kgs.forEach((kg, ki) => {
-      if (holeIndices.has(ki)) return; // This kg has a hole today
-      const availSub = subs.find(s => !usedSubIds.has(s.id)) || subs[ki % subs.length];
-      usedSubIds.add(availSub.id);
-      assignments.push({
-        id: `mock-asgn-${dateStr}-${kg.id}`,
-        assignment_date: dateStr,
-        start_time: '07:30',
-        end_time: '14:00',
-        status: dayOffset < 0 ? 'completed' : dayOffset === 0 ? 'confirmed' : 'pending',
-        kindergarten_id: kg.id,
-        kindergarten_name: kg.name,
-        kindergarten_address: kg.address,
-        neighborhood: kg.neighborhood,
-        substitute_first_name: availSub.first_name,
-        substitute_last_name: availSub.last_name,
-        substitute_phone: availSub.phone,
-        notes: null,
-      });
-    });
-  }
-  return assignments;
+interface Recommendation {
+  substituteId: string;
+  userId: string;
+  fullName: string;
+  score: number;
+  reasons: string[];
+  features: Record<string, number>;
 }
-
-const MOCK_ASSIGNMENTS = generateMockAssignments();
 
 type ViewMode = 'week' | 'month' | 'list';
 
@@ -136,7 +75,6 @@ const statusConfig: Record<string, { label: string; cls: string }> = {
 // ─── Main Component ─────────────────────────────────────────
 
 export default function DashboardPage() {
-  const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const today = new Date();
 
@@ -145,7 +83,6 @@ export default function DashboardPage() {
   const [currentDate, setCurrentDate] = useState(today);
   const [selectedDay, setSelectedDay] = useState<Date>(today);
   const [assignModal, setAssignModal] = useState<{ kindergartenId: string; date: string } | null>(null);
-  const [localAssignments, setLocalAssignments] = useState<Assignment[]>([]);
 
   // ─── Queries ───────────────────────────────────────────
   const { data: kindergartens } = useQuery<Kindergarten[]>({
@@ -153,11 +90,47 @@ export default function DashboardPage() {
     queryFn: () => api.get('/kindergartens').then(r => r.data),
   });
 
-  // Always use mock kindergartens since assignments are mock data
-  const kgs = MOCK_KINDERGARTENS;
+  const visibleMonth = currentDate.getMonth() + 1;
+  const visibleYear = currentDate.getFullYear();
+  const { data: assignments } = useQuery<Assignment[]>({
+    queryKey: ['assignments', visibleYear, visibleMonth],
+    queryFn: () => api.get('/assignments', { params: { month: visibleMonth, year: visibleYear } }).then(r => r.data),
+  });
 
-  // All assignments for the visible range
-  const allAssignments = useMemo(() => [...MOCK_ASSIGNMENTS, ...localAssignments], [localAssignments]);
+  // Also fetch the previous and next month so the visible week never shows
+  // an empty calendar near month boundaries.
+  const prev = subMonths(currentDate, 1);
+  const next = addMonths(currentDate, 1);
+  const { data: prevMonthAssignments } = useQuery<Assignment[]>({
+    queryKey: ['assignments', prev.getFullYear(), prev.getMonth() + 1],
+    queryFn: () => api.get('/assignments', { params: { month: prev.getMonth() + 1, year: prev.getFullYear() } }).then(r => r.data),
+  });
+  const { data: nextMonthAssignments } = useQuery<Assignment[]>({
+    queryKey: ['assignments', next.getFullYear(), next.getMonth() + 1],
+    queryFn: () => api.get('/assignments', { params: { month: next.getMonth() + 1, year: next.getFullYear() } }).then(r => r.data),
+  });
+  const { data: absences } = useQuery<AbsenceReport[]>({
+    queryKey: ['absences', visibleYear, visibleMonth],
+    queryFn: () => api.get('/absences', { params: { month: visibleMonth, year: visibleYear } }).then(r => r.data),
+  });
+  const { data: prevMonthAbsences } = useQuery<AbsenceReport[]>({
+    queryKey: ['absences', prev.getFullYear(), prev.getMonth() + 1],
+    queryFn: () => api.get('/absences', { params: { month: prev.getMonth() + 1, year: prev.getFullYear() } }).then(r => r.data),
+  });
+  const { data: nextMonthAbsences } = useQuery<AbsenceReport[]>({
+    queryKey: ['absences', next.getFullYear(), next.getMonth() + 1],
+    queryFn: () => api.get('/absences', { params: { month: next.getMonth() + 1, year: next.getFullYear() } }).then(r => r.data),
+  });
+
+  const kgs = useMemo(() => kindergartens ?? [], [kindergartens]);
+  const allAssignments = useMemo(
+    () => [...(prevMonthAssignments ?? []), ...(assignments ?? []), ...(nextMonthAssignments ?? [])],
+    [prevMonthAssignments, assignments, nextMonthAssignments],
+  );
+  const allAbsences = useMemo(
+    () => [...(prevMonthAbsences ?? []), ...(absences ?? []), ...(nextMonthAbsences ?? [])],
+    [prevMonthAbsences, absences, nextMonthAbsences],
+  );
 
   const selectedDayStr = format(selectedDay, 'yyyy-MM-dd');
   const holiday = isHoliday(selectedDayStr);
@@ -165,18 +138,24 @@ export default function DashboardPage() {
 
   // Assignments for selected day
   const dayAssignments = useMemo(
-    () => allAssignments.filter(a => a.assignment_date === selectedDayStr),
+    () => allAssignments.filter(a => a.assignment_date === selectedDayStr && a.status !== 'cancelled'),
     [allAssignments, selectedDayStr]
   );
 
-  // Which kindergartens have holes (no assignment) on selected day
-  const coveredKgIds = new Set(dayAssignments.map(a => a.kindergarten_id));
-  const holes = kgs.filter(kg => !coveredKgIds.has(kg.id));
+  // Holes = open absences for the selected day that haven't been covered yet.
+  const dayAbsences = useMemo(
+    () => allAbsences.filter(a => a.absence_date === selectedDayStr),
+    [allAbsences, selectedDayStr]
+  );
+  const holes = useMemo(() => dayAbsences.filter(a => a.status === 'open'), [dayAbsences]);
 
-  // Stats
+  // Stats — coverage rate of today's absences.
   const totalKgs = kgs.length;
-  const coveredCount = totalKgs - holes.length;
-  const coveragePct = totalKgs > 0 ? Math.round((coveredCount / totalKgs) * 100) : 100;
+  const totalAbsences = dayAbsences.length;
+  const coveredCount = totalAbsences - holes.length;
+  const coveragePct = totalAbsences > 0
+    ? Math.round((coveredCount / totalAbsences) * 100)
+    : 100; // No absences today = 100% coverage
 
   // ─── Navigation ────────────────────────────────────────
   const navigateBack = () => {
@@ -192,7 +171,6 @@ export default function DashboardPage() {
     .filter(d => d.getDay() !== 6); // Exclude Saturday
 
   // ─── Month days ────────────────────────────────────────
-  const monthStartDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
   const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
   const allMonthDates = Array.from({ length: daysInMonth }, (_, i) =>
     new Date(currentDate.getFullYear(), currentDate.getMonth(), i + 1)
@@ -204,38 +182,33 @@ export default function DashboardPage() {
   ];
 
   // ─── Date cell info ────────────────────────────────────
-  const getDateInfo = (dateStr: string, day: Date) => {
+  const getDateInfo = (dateStr: string, _day: Date) => {
     const hol = isHoliday(dateStr);
     if (hol) return { status: 'holiday' as const, label: hol.name };
-    const dayAsgns = allAssignments.filter(a => a.assignment_date === dateStr);
-    const dayHoles = totalKgs - dayAsgns.length;
+    const dayHoles = allAbsences.filter(a => a.absence_date === dateStr && a.status === 'open').length;
     if (dayHoles === 0) return { status: 'full' as const, label: '' };
-    if (dayHoles > 0) return { status: 'holes' as const, label: `${dayHoles}` };
-    return { status: 'full' as const, label: '' };
+    return { status: 'holes' as const, label: `${dayHoles}` };
   };
 
-  // ─── Mock assign handler ───────────────────────────────
+  // ─── Real assign mutation ──────────────────────────────
+  const assignMutation = useMutation({
+    mutationFn: (vars: { kindergartenId: string; substituteId: string; date: string }) =>
+      api.post('/assignments', {
+        kindergartenId: vars.kindergartenId,
+        substituteId: vars.substituteId,
+        assignmentDate: vars.date,
+      }).then(r => r.data),
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['assignments'] });
+      const kg = kgs.find(k => k.id === vars.kindergartenId);
+      toast.success(`השיבוץ נוצר ל${kg?.name ?? 'גן'}`);
+      setAssignModal(null);
+    },
+    onError: (err) => handleApiError(err, 'POST /api/assignments'),
+  });
+
   const handleAssign = (kindergartenId: string, substituteId: string, date: string) => {
-    const kg = kgs.find(k => k.id === kindergartenId)!;
-    const sub = MOCK_AVAILABLE_SUBS.find(s => s.id === substituteId)!;
-    const newAssignment: Assignment = {
-      id: `local-${Date.now()}`,
-      assignment_date: date,
-      start_time: '07:30',
-      end_time: '14:00',
-      status: 'pending',
-      kindergarten_id: kindergartenId,
-      kindergarten_name: kg.name,
-      kindergarten_address: kg.address,
-      neighborhood: kg.neighborhood,
-      substitute_first_name: sub.first_name,
-      substitute_last_name: sub.last_name,
-      substitute_phone: sub.phone,
-      notes: null,
-    };
-    setLocalAssignments(prev => [...prev, newAssignment]);
-    setAssignModal(null);
-    toast.success(`${sub.first_name} ${sub.last_name} שובצה ל${kg.name}`);
+    assignMutation.mutate({ kindergartenId, substituteId, date });
   };
 
   // ─── Render ────────────────────────────────────────────
@@ -412,8 +385,9 @@ export default function DashboardPage() {
                   .map(day => {
                     const dateStr = format(day, 'yyyy-MM-dd');
                     const hol = isHoliday(dateStr);
-                    const dayAsgns = allAssignments.filter(a => a.assignment_date === dateStr);
-                    const dayHoles = totalKgs - dayAsgns.length;
+                    const dayAbs = allAbsences.filter(a => a.absence_date === dateStr);
+                    const dayHoles = dayAbs.filter(a => a.status === 'open').length;
+                    const dayCovered = dayAbs.length - dayHoles;
                     const isTodayDate = isToday(day);
 
                     return (
@@ -438,10 +412,12 @@ export default function DashboardPage() {
                         <div className="flex-1 min-w-0">
                           {hol ? (
                             <p className="text-sm font-semibold text-purple-700">{hol.name}</p>
+                          ) : dayAbs.length === 0 ? (
+                            <p className="text-sm text-slate-500">אין היעדרויות</p>
                           ) : (
                             <>
                               <p className="text-sm font-semibold text-navy-900">
-                                {dayAsgns.length}/{totalKgs} גנים מכוסים
+                                {dayCovered}/{dayAbs.length} היעדרויות מכוסות
                               </p>
                               {dayHoles > 0 && (
                                 <p className="text-xs text-red-500">{dayHoles} חורים לאיוש</p>
@@ -504,29 +480,35 @@ export default function DashboardPage() {
             ) : (
               <>
                 <p className="text-slate-500 text-sm">
-                  {coveredCount}/{totalKgs} גנים מכוסים
-                  {holes.length > 0 && <span className="text-red-500 font-semibold"> • {holes.length} חורים</span>}
+                  {totalAbsences === 0
+                    ? 'אין היעדרויות מדווחות היום'
+                    : <>{coveredCount}/{totalAbsences} היעדרויות מכוסות
+                        {holes.length > 0 && <span className="text-red-500 font-semibold"> • {holes.length} חורים</span>}
+                      </>}
                 </p>
 
-                {/* Holes - action items */}
+                {/* Holes - action items (open absences without coverage) */}
                 {holes.length > 0 && (
                   <div className="mt-4">
                     <h4 className="text-sm font-bold text-red-600 mb-2 flex items-center gap-1.5">
                       <AlertTriangle size={14} />
-                      גנים ללא מחליפה
+                      היעדרויות ללא מחליפה
                     </h4>
                     <div className="space-y-2">
-                      {holes.map(kg => (
+                      {holes.map(absence => (
                         <div
-                          key={kg.id}
+                          key={absence.id}
                           className="flex items-center justify-between py-2.5 px-3 rounded-xl bg-red-50 border border-red-200"
                         >
                           <div className="min-w-0">
-                            <p className="text-sm font-semibold text-navy-900">{kg.name}</p>
-                            <p className="text-xs text-slate-500">{kg.address}</p>
+                            <p className="text-sm font-semibold text-navy-900">{absence.kindergarten_name}</p>
+                            <p className="text-xs text-slate-500">
+                              {absence.absent_employee_name}
+                              {absence.kindergarten_address && ` • ${absence.kindergarten_address}`}
+                            </p>
                           </div>
                           <button
-                            onClick={() => setAssignModal({ kindergartenId: kg.id, date: selectedDayStr })}
+                            onClick={() => setAssignModal({ kindergartenId: absence.kindergarten_id, date: selectedDayStr })}
                             className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1 flex-shrink-0"
                           >
                             <Plus size={12} />
@@ -567,10 +549,10 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                {holes.length === 0 && dayAssignments.length > 0 && (
+                {holes.length === 0 && totalAbsences > 0 && (
                   <div className="bg-mint-50 rounded-xl p-3 text-center mt-4">
                     <CheckCircle size={20} className="text-mint-500 mx-auto mb-1" />
-                    <p className="text-mint-700 text-sm font-semibold">כל הגנים מכוסים!</p>
+                    <p className="text-mint-700 text-sm font-semibold">כל ההיעדרויות מכוסות!</p>
                   </div>
                 )}
               </>
@@ -594,22 +576,16 @@ export default function DashboardPage() {
       </div>
 
       {/* ─── Assign Modal ─── */}
-      {assignModal && (() => {
-        // Filter out subs already assigned on this date
-        const dateAsgns = allAssignments.filter(a => a.assignment_date === assignModal.date);
-        const assignedSubNames = new Set(dateAsgns.map(a => `${a.substitute_first_name} ${a.substitute_last_name}`));
-        const freeSubs = MOCK_AVAILABLE_SUBS.filter(s => !assignedSubNames.has(`${s.first_name} ${s.last_name}`));
-        return (
-          <AssignModal
-            kindergartenId={assignModal.kindergartenId}
-            kindergartenName={kgs.find(k => k.id === assignModal.kindergartenId)?.name || ''}
-            date={assignModal.date}
-            availableSubs={freeSubs}
-            onClose={() => setAssignModal(null)}
-            onAssign={(subId) => handleAssign(assignModal.kindergartenId, subId, assignModal.date)}
-          />
-        );
-      })()}
+      {assignModal && (
+        <AssignModal
+          kindergartenId={assignModal.kindergartenId}
+          kindergartenName={kgs.find(k => k.id === assignModal.kindergartenId)?.name || ''}
+          date={assignModal.date}
+          onClose={() => setAssignModal(null)}
+          onAssign={(subId) => handleAssign(assignModal.kindergartenId, subId, assignModal.date)}
+          submitting={assignMutation.isPending}
+        />
+      )}
     </div>
   );
 }
@@ -617,28 +593,40 @@ export default function DashboardPage() {
 // ─── Assign Modal Component ─────────────────────────────────
 
 function AssignModal({
+  kindergartenId,
   kindergartenName,
   date,
-  availableSubs,
   onClose,
   onAssign,
+  submitting,
 }: {
   kindergartenId: string;
   kindergartenName: string;
   date: string;
-  availableSubs: AvailableSub[];
   onClose: () => void;
   onAssign: (subId: string) => void;
+  submitting: boolean;
 }) {
   const [selectedSub, setSelectedSub] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const selectedSubObj = availableSubs.find(s => s.id === selectedSub);
+  // ML-powered recommendations: filtered for permit/active/conflict and
+  // ranked by match probability. Cold-starts gracefully when no model
+  // is trained yet.
+  const { data, isLoading, isError } = useQuery<{
+    count: number;
+    recommendations: Recommendation[];
+  }>({
+    queryKey: ['ml-recommend', kindergartenId, date],
+    queryFn: () =>
+      api.get('/ml/recommend', { params: { kindergartenId, date, topK: 20 } }).then(r => r.data),
+  });
+
+  const recs = data?.recommendations ?? [];
+  const selectedRec = recs.find(r => r.substituteId === selectedSub);
 
   const handleConfirmAssign = () => {
-    if (selectedSub) {
-      onAssign(selectedSub);
-    }
+    if (selectedSub) onAssign(selectedSub);
   };
 
   return (
@@ -661,48 +649,70 @@ function AssignModal({
           </div>
 
           <div>
-            <label className="text-sm font-semibold text-navy-900 mb-2 block">
-              בחרי מחליפה ({availableSubs.length} זמינות)
+            <label className="text-sm font-semibold text-navy-900 mb-2 flex items-center gap-1.5">
+              <Sparkles size={14} className="text-mint-500" />
+              המלצות חכמות ({recs.length})
             </label>
-            {availableSubs.length > 0 ? (
-              <div className="space-y-1.5 max-h-64 overflow-y-auto">
-                {availableSubs.map(s => (
-                  <label
-                    key={s.id}
-                    className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors border ${
-                      selectedSub === s.id
-                        ? 'bg-mint-50 border-mint-300'
-                        : 'border-slate-100 hover:bg-slate-50'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="substitute"
-                      value={s.id}
-                      checked={selectedSub === s.id}
-                      onChange={() => setSelectedSub(s.id)}
-                      className="accent-mint-500"
-                    />
-                    <div className="w-8 h-8 rounded-full bg-navy-900 flex items-center justify-center text-xs font-bold text-mint-400 flex-shrink-0">
-                      {s.first_name[0]}{s.last_name[0]}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-navy-900">{s.first_name} {s.last_name}</p>
-                      <p className="text-xs text-slate-400">
-                        {s.education_level} • {s.years_experience} שנות ניסיון • {s.total_assignments} שיבוצים
-                      </p>
-                    </div>
-                    <div className="text-xs text-slate-400 flex items-center gap-1">
-                      <Phone size={10} />
-                      {s.phone}
-                    </div>
-                  </label>
-                ))}
+            {isLoading ? (
+              <div className="text-center py-6 text-sm text-slate-500">טוען...</div>
+            ) : isError ? (
+              <div className="text-center py-6 border border-red-200 rounded-xl">
+                <AlertTriangle size={24} className="text-red-400 mx-auto mb-2" />
+                <p className="text-sm text-red-600 font-medium">שגיאה בטעינת המלצות</p>
+              </div>
+            ) : recs.length > 0 ? (
+              <div className="space-y-1.5 max-h-72 overflow-y-auto">
+                {recs.map((r, idx) => {
+                  const initials = r.fullName.split(' ').map(s => s[0]).slice(0, 2).join('');
+                  return (
+                    <label
+                      key={r.substituteId}
+                      className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors border ${
+                        selectedSub === r.substituteId
+                          ? 'bg-mint-50 border-mint-300'
+                          : 'border-slate-100 hover:bg-slate-50'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="substitute"
+                        value={r.substituteId}
+                        checked={selectedSub === r.substituteId}
+                        onChange={() => setSelectedSub(r.substituteId)}
+                        className="accent-mint-500 mt-1"
+                      />
+                      <div className="w-8 h-8 rounded-full bg-navy-900 flex items-center justify-center text-xs font-bold text-mint-400 flex-shrink-0">
+                        {initials}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-navy-900 truncate">{r.fullName}</p>
+                          <span className="text-[10px] font-bold bg-mint-100 text-mint-700 px-2 py-0.5 rounded-full whitespace-nowrap">
+                            {idx === 0 && '⭐ '}
+                            {Math.round(r.score * 100)}%
+                          </span>
+                        </div>
+                        {r.reasons.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {r.reasons.map(reason => (
+                              <span key={reason} className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+                                {reason}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-6 border border-slate-200 rounded-xl">
                 <AlertTriangle size={24} className="text-amber-400 mx-auto mb-2" />
-                <p className="text-sm text-slate-500 font-medium">כל המחליפות כבר משובצות ליום זה</p>
+                <p className="text-sm text-slate-500 font-medium">אין מחליפות זמינות ליום זה</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  כל המחליפות הפעילות כבר משובצות, או שאין מחליפות עם תיק עובד תקף.
+                </p>
               </div>
             )}
           </div>
@@ -710,7 +720,7 @@ function AssignModal({
           <div className="flex gap-2 mt-5">
             <button
               onClick={() => selectedSub && setShowConfirm(true)}
-              disabled={!selectedSub}
+              disabled={!selectedSub || submitting}
               className="btn-primary flex-1 disabled:opacity-50"
             >
               שבצי מחליפה
@@ -726,7 +736,7 @@ function AssignModal({
           </div>
           <h3 className="font-bold text-navy-900 text-lg mb-2">אישור שיבוץ</h3>
           <p className="text-slate-600 text-sm mb-1">
-            לשבץ את <span className="font-bold text-navy-900">{selectedSubObj?.first_name} {selectedSubObj?.last_name}</span>
+            לשבץ את <span className="font-bold text-navy-900">{selectedRec?.fullName}</span>
           </p>
           <p className="text-slate-600 text-sm mb-1">
             ל<span className="font-bold text-navy-900">{kindergartenName}</span>
@@ -735,8 +745,8 @@ function AssignModal({
             {format(parseISO(date), 'EEEE, d בMMMM yyyy', { locale: he })}
           </p>
           <div className="flex gap-2">
-            <button onClick={handleConfirmAssign} className="btn-primary flex-1">
-              אישור
+            <button onClick={handleConfirmAssign} disabled={submitting} className="btn-primary flex-1 disabled:opacity-50">
+              {submitting ? 'שולח...' : 'אישור'}
             </button>
             <button onClick={() => setShowConfirm(false)} className="btn-secondary flex-1">
               חזרה
