@@ -34,22 +34,50 @@ export async function runMigrations() {
   // Add teaching_license_url column if missing
   await query(`ALTER TABLE substitutes ADD COLUMN IF NOT EXISTS teaching_license_url VARCHAR(500)`).catch(() => {});
 
-  // Seed if no users exist. Prefer the rich seed (10 substitutes, 20
-  // kindergartens, real assignments + absences) so the dashboard and ML
-  // models have realistic data from day one. Fall back to the minimal
-  // demo seed if the rich seed fails for any reason.
+  // Seed strategy:
+  //   1. Empty DB → run the full seed (10 subs, 20 kindergartens, 40 absences)
+  //      so dashboard + ML have realistic data from day one.
+  //   2. DB has users but the Negev demo accounts are missing → also run
+  //      the full seed. seed-full is idempotent (skips rows that already
+  //      exist by email/name), so this safely "tops up" existing
+  //      deployments without disturbing other authorities' data.
+  //   3. DB already has the Negev demo → skip.
+  // The minimal `seedData()` is kept only as a last-resort fallback.
   const users = await query('SELECT COUNT(*)::int AS count FROM users');
-  if (users.rows[0].count === 0) {
-    console.log('🌱 Seeding demo data (full)...');
+  const demo = await query(
+    `SELECT COUNT(*)::int AS count FROM users WHERE email = 'manager1@negev.gov.il'`,
+  );
+  const dbEmpty = users.rows[0].count === 0;
+  const demoMissing = demo.rows[0].count === 0;
+
+  if (dbEmpty || demoMissing) {
+    console.log(
+      dbEmpty
+        ? '🌱 Empty database — running full seed...'
+        : '🌱 Demo accounts missing — topping up via idempotent full seed...',
+    );
     try {
       const { seedFull } = await import('./seed-full');
       await seedFull();
     } catch (err) {
-      console.error('⚠️  Full seed failed, falling back to minimal demo seed:', err);
-      await seedData();
+      console.error('⚠️  Full seed failed:', err);
+      if (dbEmpty) {
+        console.log('   Falling back to minimal demo seed.');
+        await seedData();
+      }
     }
   } else {
-    console.log('ℹ️  Data already exists, skipping seed');
+    console.log('ℹ️  Demo accounts already present, skipping seed');
+  }
+
+  // Always force-reset the documented demo passwords. Cheap, idempotent,
+  // and guarantees that "Demo1234!" works for the documented accounts even
+  // if an earlier broken seed wrote a bad hash, or password format changed.
+  try {
+    const { resetDemoPasswords } = await import('./seed-full');
+    await resetDemoPasswords();
+  } catch (err) {
+    console.warn('⚠️  Could not reset demo passwords:', err);
   }
 
   console.log('✅ Migration complete');
