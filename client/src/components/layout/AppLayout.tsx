@@ -2,7 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Calendar, ClipboardList,
   BarChart3, Settings, LogOut, Bell, Menu, X, Activity,
-  CalendarCheck, Building2, BookOpen,
+  CalendarCheck, Building2, BookOpen, Brain,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuthStore, UserRole } from '@/context/authStore';
@@ -16,6 +16,7 @@ const navItems: Record<UserRole, { href: string; label: string; icon: React.Reac
     { href: '/absences', label: 'היעדרויות', icon: <ClipboardList size={18} /> },
     { href: '/known-absences', label: 'היעדרויות ידועות', icon: <BookOpen size={18} /> },
     { href: '/manager-kindergartens', label: 'מנהלי גנים', icon: <Building2 size={18} /> },
+    { href: '/ml-insights', label: 'תובנות AI', icon: <Brain size={18} /> },
     { href: '/reports', label: 'דוחות', icon: <BarChart3 size={18} /> },
     { href: '/settings', label: 'הגדרות', icon: <Settings size={18} /> },
     { href: '/profile', label: 'פרופיל', icon: <Users size={18} /> },
@@ -26,6 +27,7 @@ const navItems: Record<UserRole, { href: string; label: string; icon: React.Reac
     { href: '/substitutes', label: 'מחליפות', icon: <Users size={18} /> },
     { href: '/absences', label: 'היעדרויות', icon: <ClipboardList size={18} /> },
     { href: '/known-absences', label: 'היעדרויות ידועות', icon: <BookOpen size={18} /> },
+    { href: '/ml-insights', label: 'תובנות AI', icon: <Brain size={18} /> },
     { href: '/reports', label: 'דוחות', icon: <BarChart3 size={18} /> },
     { href: '/profile', label: 'פרופיל', icon: <Users size={18} /> },
   ],

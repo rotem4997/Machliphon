@@ -22,6 +22,25 @@ function requireAuthorityScope(req: AuthRequest): string {
   return req.user.authority_id;
 }
 
+// Auto-bootstrap a model the first time it's needed. If no snapshot exists in
+// ml_models for (authority, kind), train one inline so the recommender / risk /
+// forecast endpoints "just work" without requiring an explicit POST /train.
+// Errors are swallowed — the endpoint will fall back to its built-in heuristic.
+async function ensureTrained(authorityId: string, kind: 'match' | 'no_show' | 'demand') {
+  try {
+    const r = await query(
+      `SELECT 1 FROM ml_models WHERE authority_id = $1 AND kind = $2`,
+      [authorityId, kind],
+    );
+    if (r.rows.length > 0) return;
+    if (kind === 'match') await trainMatchModel(authorityId);
+    else if (kind === 'no_show') await trainNoShowModel(authorityId);
+    else await trainDemandModels(authorityId);
+  } catch (err) {
+    console.warn(`[ml] auto-train (${kind}) failed:`, err);
+  }
+}
+
 // GET /api/ml/recommend?kindergartenId=...&date=YYYY-MM-DD&topK=10
 router.get('/recommend', requireRole('manager', 'authority_admin', 'super_admin'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
@@ -41,6 +60,7 @@ router.get('/recommend', requireRole('manager', 'authority_admin', 'super_admin'
       });
     }
     const k = Math.min(Math.max(parseInt(String(topK ?? '10'), 10) || 10, 1), 50);
+    await ensureTrained(authorityId, 'match');
     const recs = await recommendSubstitutes(authorityId, String(kindergartenId), String(date), k);
 
     // Audit-log the top recommendation so we can later evaluate accuracy.
@@ -64,6 +84,7 @@ router.get('/no-show-risk/:assignmentId',
   requireRole('manager', 'authority_admin', 'super_admin'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const authorityId = requireAuthorityScope(req);
+    await ensureTrained(authorityId, 'no_show');
     const result = await predictNoShowRisk(authorityId, req.params.assignmentId);
     if (!result) {
       throw new NotFoundError('שיבוץ לא נמצא.', {
@@ -108,6 +129,7 @@ router.get('/forecast', requireRole('manager', 'authority_admin', 'super_admin')
       });
     }
 
+    await ensureTrained(authorityId, 'demand');
     const forecast = await forecastDemand(authorityId, String(kindergartenId), horizon);
     if (!forecast) {
       throw new NotFoundError('לא ניתן להפיק תחזית עבור גן זה.', {
