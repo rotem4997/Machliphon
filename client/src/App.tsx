@@ -18,6 +18,7 @@ import ProfilePage from './pages/ProfilePage';
 import AvailabilityPage from './pages/AvailabilityPage';
 import KnownAbsencesPage from './pages/KnownAbsencesPage';
 import ManagerKindergartensPage from './pages/ManagerKindergartensPage';
+import MLInsightsPage from './pages/MLInsightsPage';
 import { useAuthStore } from './context/authStore';
 
 const queryClient = new QueryClient({
@@ -67,6 +68,11 @@ export default function App() {
                 <Route index element={<ManagerKindergartensPage />} />
               </Route>
               <Route path="/activity" element={<ActivityDashboard />} />
+              <Route path="/ml-insights" element={
+                <ProtectedRoute allowedRoles={['manager', 'authority_admin', 'super_admin']} />
+              }>
+                <Route index element={<MLInsightsPage />} />
+              </Route>
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/settings" element={<div className="text-slate-400 text-center py-20">בפיתוח...</div>} />
               <Route path="/profile" element={<ProfilePage />} />
