@@ -221,11 +221,26 @@ async function main() {
 
   // ──────────────────────────────────────────────
   // ABSENCE REPORTS (mix of past/today/future statuses)
+  // Designed so the dashboard always has visible holes to demonstrate
+  // the assignment flow + ML recommendations.
   // ──────────────────────────────────────────────
   const today = new Date();
   const d = (n: number) => { const x = new Date(today); x.setDate(x.getDate() + n); return x.toISOString().split('T')[0]; };
+  // Skip Saturdays — no assignments on Shabbat in Israeli kindergartens.
+  const isSaturday = (n: number) => { const x = new Date(today); x.setDate(x.getDate() + n); return x.getDay() === 6; };
+  const nextWeekday = (n: number) => { let i = n; while (isSaturday(i)) i++; return i; };
+
+  const t0 = nextWeekday(0);  // today (or next Sunday if today is Sat)
+  const t1 = nextWeekday(t0 + 1);
+  const t2 = nextWeekday(t1 + 1);
+  const t3 = nextWeekday(t2 + 1);
+  const t4 = nextWeekday(t3 + 1);
+  const t5 = nextWeekday(t4 + 1);
+  const t6 = nextWeekday(t5 + 1);
+  const t7 = nextWeekday(t6 + 1);
 
   const absenceDefs = [
+    // ─── Past, all covered (gives the calendar healthy history) ───
     { kg: kgIds[0], name: 'יעל כהן', role: 'teacher', date: d(-10), reason: 'sick', status: 'covered', reporter: mgr1UserId },
     { kg: kgIds[1], name: 'חנה ברק', role: 'assistant', date: d(-8), reason: 'vacation', status: 'covered', reporter: mgr1UserId },
     { kg: kgIds[2], name: 'תמר שלום', role: 'teacher', date: d(-6), reason: 'emergency', status: 'covered', reporter: mgr1UserId },
@@ -234,20 +249,54 @@ async function main() {
     { kg: kgIds[10], name: 'שושנה עוז', role: 'teacher', date: d(-7), reason: 'vacation', status: 'covered', reporter: mgr2UserId },
     { kg: kgIds[11], name: 'אסתר לפיד', role: 'teacher', date: d(-5), reason: 'sick', status: 'covered', reporter: mgr2UserId },
     { kg: kgIds[12], name: 'פנינה גל', role: 'assistant', date: d(-3), reason: 'sick', status: 'covered', reporter: mgr2UserId },
-    // Today
-    { kg: kgIds[0], name: 'יעל כהן', role: 'teacher', date: d(0), reason: 'sick', status: 'assigned', reporter: mgr1UserId },
-    { kg: kgIds[5], name: 'רבקה שמש', role: 'teacher', date: d(0), reason: 'vacation', status: 'open', reporter: mgr1UserId },
-    { kg: kgIds[10], name: 'שושנה עוז', role: 'teacher', date: d(0), reason: 'sick', status: 'open', reporter: mgr2UserId },
-    // Upcoming
-    { kg: kgIds[1], name: 'חנה ברק', role: 'assistant', date: d(1), reason: 'vacation', status: 'open', reporter: mgr1UserId },
-    { kg: kgIds[6], name: 'לאה נמר', role: 'teacher', date: d(2), reason: 'sick', status: 'open', reporter: mgr1UserId },
-    { kg: kgIds[11], name: 'אסתר לפיד', role: 'teacher', date: d(2), reason: 'known', status: 'open', reporter: mgr2UserId },
-    { kg: kgIds[13], name: 'ורד פינקל', role: 'assistant', date: d(3), reason: 'vacation', status: 'open', reporter: mgr2UserId },
-    { kg: kgIds[2], name: 'תמר שלום', role: 'teacher', date: d(4), reason: 'sick', status: 'open', reporter: mgr1UserId },
-    { kg: kgIds[14], name: 'זיוה בן חיים', role: 'teacher', date: d(5), reason: 'emergency', status: 'open', reporter: mgr2UserId },
-    { kg: kgIds[7], name: 'נחמה ציון', role: 'assistant', date: d(7), reason: 'vacation', status: 'open', reporter: mgr1UserId },
-    { kg: kgIds[15], name: 'מלכה אשר', role: 'teacher', date: d(7), reason: 'sick', status: 'open', reporter: mgr2UserId },
-    { kg: kgIds[3], name: 'רות יפה', role: 'teacher', date: d(10), reason: 'known', status: 'open', reporter: mgr1UserId },
+
+    // ─── TODAY: 8 holes + 1 already assigned for visual contrast ───
+    { kg: kgIds[0], name: 'יעל כהן', role: 'teacher', date: d(t0), reason: 'sick', status: 'assigned', reporter: mgr1UserId },
+    { kg: kgIds[1], name: 'חנה ברק', role: 'assistant', date: d(t0), reason: 'sick', status: 'open', reporter: mgr1UserId },
+    { kg: kgIds[2], name: 'תמר שלום', role: 'teacher', date: d(t0), reason: 'emergency', status: 'open', reporter: mgr1UserId },
+    { kg: kgIds[3], name: 'רות יפה', role: 'teacher', date: d(t0), reason: 'sick', status: 'open', reporter: mgr1UserId },
+    { kg: kgIds[5], name: 'רבקה שמש', role: 'teacher', date: d(t0), reason: 'vacation', status: 'open', reporter: mgr1UserId },
+    { kg: kgIds[10], name: 'שושנה עוז', role: 'teacher', date: d(t0), reason: 'sick', status: 'open', reporter: mgr2UserId },
+    { kg: kgIds[11], name: 'אסתר לפיד', role: 'teacher', date: d(t0), reason: 'sick', status: 'open', reporter: mgr2UserId },
+    { kg: kgIds[12], name: 'פנינה גל', role: 'assistant', date: d(t0), reason: 'emergency', status: 'open', reporter: mgr2UserId },
+    { kg: kgIds[13], name: 'ורד פינקל', role: 'assistant', date: d(t0), reason: 'sick', status: 'open', reporter: mgr2UserId },
+
+    // ─── TOMORROW (or next weekday): 5 open holes ───
+    { kg: kgIds[1], name: 'חנה ברק', role: 'assistant', date: d(t1), reason: 'vacation', status: 'open', reporter: mgr1UserId },
+    { kg: kgIds[4], name: 'מרים אלון', role: 'assistant', date: d(t1), reason: 'sick', status: 'open', reporter: mgr1UserId },
+    { kg: kgIds[6], name: 'לאה נמר', role: 'teacher', date: d(t1), reason: 'sick', status: 'open', reporter: mgr1UserId },
+    { kg: kgIds[14], name: 'זיוה בן חיים', role: 'teacher', date: d(t1), reason: 'sick', status: 'open', reporter: mgr2UserId },
+    { kg: kgIds[15], name: 'מלכה אשר', role: 'teacher', date: d(t1), reason: 'vacation', status: 'open', reporter: mgr2UserId },
+
+    // ─── +2 days: 4 open ───
+    { kg: kgIds[2], name: 'תמר שלום', role: 'teacher', date: d(t2), reason: 'sick', status: 'open', reporter: mgr1UserId },
+    { kg: kgIds[7], name: 'נחמה ציון', role: 'assistant', date: d(t2), reason: 'vacation', status: 'open', reporter: mgr1UserId },
+    { kg: kgIds[11], name: 'אסתר לפיד', role: 'teacher', date: d(t2), reason: 'known', status: 'open', reporter: mgr2UserId },
+    { kg: kgIds[16], name: 'אורנה הראל', role: 'assistant', date: d(t2), reason: 'sick', status: 'open', reporter: mgr2UserId },
+
+    // ─── +3 days: 3 open ───
+    { kg: kgIds[5], name: 'רבקה שמש', role: 'teacher', date: d(t3), reason: 'vacation', status: 'open', reporter: mgr1UserId },
+    { kg: kgIds[8], name: 'שמרית פלד', role: 'teacher', date: d(t3), reason: 'sick', status: 'open', reporter: mgr1UserId },
+    { kg: kgIds[13], name: 'ורד פינקל', role: 'assistant', date: d(t3), reason: 'vacation', status: 'open', reporter: mgr2UserId },
+
+    // ─── +4 days: 4 open ───
+    { kg: kgIds[0], name: 'יעל כהן', role: 'teacher', date: d(t4), reason: 'sick', status: 'open', reporter: mgr1UserId },
+    { kg: kgIds[9], name: 'תהילה רוט', role: 'assistant', date: d(t4), reason: 'sick', status: 'open', reporter: mgr1UserId },
+    { kg: kgIds[14], name: 'זיוה בן חיים', role: 'teacher', date: d(t4), reason: 'emergency', status: 'open', reporter: mgr2UserId },
+    { kg: kgIds[17], name: 'גל בלאו', role: 'teacher', date: d(t4), reason: 'sick', status: 'open', reporter: mgr2UserId },
+
+    // ─── +5 days: 2 open ───
+    { kg: kgIds[3], name: 'רות יפה', role: 'teacher', date: d(t5), reason: 'sick', status: 'open', reporter: mgr1UserId },
+    { kg: kgIds[18], name: 'ברוריה לב', role: 'assistant', date: d(t5), reason: 'vacation', status: 'open', reporter: mgr2UserId },
+
+    // ─── +6 days: 3 open ───
+    { kg: kgIds[6], name: 'לאה נמר', role: 'teacher', date: d(t6), reason: 'known', status: 'open', reporter: mgr1UserId },
+    { kg: kgIds[15], name: 'מלכה אשר', role: 'teacher', date: d(t6), reason: 'sick', status: 'open', reporter: mgr2UserId },
+    { kg: kgIds[19], name: 'נילי עמית', role: 'assistant', date: d(t6), reason: 'sick', status: 'open', reporter: mgr2UserId },
+
+    // ─── +7 days: 2 open ───
+    { kg: kgIds[7], name: 'נחמה ציון', role: 'assistant', date: d(t7), reason: 'vacation', status: 'open', reporter: mgr1UserId },
+    { kg: kgIds[12], name: 'פנינה גל', role: 'assistant', date: d(t7), reason: 'sick', status: 'open', reporter: mgr2UserId },
   ];
 
   const absenceIds: string[] = [];
@@ -283,8 +332,8 @@ async function main() {
     { absIdx: 5, subIdx: 1, kgIdx: 10, date: d(-7), status: 'completed', hrs: 6, rate: 45, reporter: mgr2UserId },
     { absIdx: 6, subIdx: 2, kgIdx: 11, date: d(-5), status: 'completed', hrs: 6.5, rate: 45, reporter: mgr2UserId },
     { absIdx: 7, subIdx: 0, kgIdx: 12, date: d(-3), status: 'completed', hrs: 5.5, rate: 45, reporter: mgr2UserId },
-    // Today - arrived/confirmed
-    { absIdx: 8, subIdx: 0, kgIdx: 0, date: d(0), status: 'arrived', hrs: null, rate: 45, reporter: mgr1UserId },
+    // Today - arrived/confirmed (matches the "assigned" absence at absIdx 8)
+    { absIdx: 8, subIdx: 0, kgIdx: 0, date: d(t0), status: 'arrived', hrs: null, rate: 45, reporter: mgr1UserId },
   ];
 
   for (const a of assignmentDefs) {
