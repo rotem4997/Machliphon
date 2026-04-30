@@ -165,6 +165,8 @@ export interface DemandSeries {
 export interface DemandModel {
   // Mean absences per day-of-week (0=Sun..6=Sat)
   perDow: number[];
+  // Std-dev per day-of-week (used for confidence bands); optional for backward compat
+  perDowStd?: number[];
   // Recent 7-day rolling mean
   recentMean: number;
   // Total samples used
@@ -173,6 +175,7 @@ export interface DemandModel {
 
 export function trainDemandModel(series: DemandSeries, today: Date): DemandModel {
   const perDow = new Array(7).fill(0);
+  const perDowSumSq = new Array(7).fill(0);
   const counts = new Array(7).fill(0);
   let recentSum = 0;
   let recentDays = 0;
@@ -183,17 +186,32 @@ export function trainDemandModel(series: DemandSeries, today: Date): DemandModel
     const d = new Date(date + 'T00:00:00Z');
     const dow = d.getUTCDay();
     perDow[dow] += n;
+    perDowSumSq[dow] += n * n;
     counts[dow]++;
     if (d >= recentCutoff && d <= today) {
       recentSum += n;
       recentDays++;
     }
   }
+
+  const perDowStd = new Array(7).fill(0);
   for (let i = 0; i < 7; i++) {
-    perDow[i] = counts[i] > 0 ? perDow[i] / counts[i] : 0;
+    const c = counts[i];
+    if (c > 0) {
+      const mean = perDow[i] / c;
+      perDow[i] = mean;
+      // Population std dev
+      perDowStd[i] = c > 1
+        ? Math.sqrt(Math.max(0, perDowSumSq[i] / c - mean * mean))
+        : mean * 0.3;
+    } else {
+      perDowStd[i] = 0;
+    }
   }
+
   return {
     perDow,
+    perDowStd,
     recentMean: recentDays > 0 ? recentSum / recentDays : 0,
     samples: series.counts.size,
   };

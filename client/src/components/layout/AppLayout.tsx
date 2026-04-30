@@ -41,6 +41,7 @@ const navItems: Record<UserRole, { href: string; label: string; icon: React.Reac
     { href: '/authorities', label: 'רשויות', icon: <BarChart3 size={18} /> },
     { href: '/substitutes', label: 'מחליפות', icon: <Users size={18} /> },
     { href: '/known-absences', label: 'היעדרויות ידועות', icon: <BookOpen size={18} /> },
+    { href: '/ml-insights', label: 'תובנות AI', icon: <Brain size={18} /> },
     { href: '/settings', label: 'הגדרות', icon: <Settings size={18} /> },
   ],
 };

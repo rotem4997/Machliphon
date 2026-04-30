@@ -2,14 +2,14 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Brain, TrendingUp, AlertTriangle, Star, Users,
-  RefreshCw, CheckCircle, XCircle, Clock, BarChart2,
+  RefreshCw, CheckCircle, XCircle,
   ChevronDown, ChevronUp,
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, BarChart, Bar, Legend,
+  ResponsiveContainer,
 } from 'recharts';
-import { format, addDays } from 'date-fns';
+import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 import api, { handleApiError } from '@/utils/api';
 import toast from 'react-hot-toast';
@@ -55,22 +55,33 @@ interface Kindergarten {
   name: string;
 }
 
+interface IntegrityFinding {
+  severity: 'error' | 'warning' | 'info';
+  code: string;
+  message: string;
+  detail: string;
+  count: number;
+  sampleIds?: string[];
+}
+
 interface IntegrityReport {
+  authorityId: string;
+  generatedAt: string;
   ok: boolean;
-  checks: { name: string; ok: boolean; count: number; detail: string }[];
+  findings: IntegrityFinding[];
 }
 
 // ─── Helpers ─────────────────────────────────────────────────
 
 function bandColor(score: number) {
-  if (score >= 0.7) return 'text-red-600 bg-red-50';
-  if (score >= 0.4) return 'text-amber-600 bg-amber-50';
+  if (score >= 0.5) return 'text-red-600 bg-red-50';
+  if (score >= 0.2) return 'text-amber-600 bg-amber-50';
   return 'text-emerald-600 bg-emerald-50';
 }
 
 function bandLabel(score: number) {
-  if (score >= 0.7) return 'סיכון גבוה';
-  if (score >= 0.4) return 'סיכון בינוני';
+  if (score >= 0.5) return 'סיכון גבוה';
+  if (score >= 0.2) return 'סיכון בינוני';
   return 'סיכון נמוך';
 }
 
@@ -269,26 +280,35 @@ export default function MLInsightsPage() {
           <div className="h-20 rounded-2xl bg-slate-100 animate-pulse" />
         ) : integrity ? (
           <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">
-            {integrity.checks.map(c => (
-              <div key={c.name} className="flex items-center justify-between px-5 py-3">
-                <div className="flex items-center gap-3">
-                  {c.ok
-                    ? <CheckCircle size={16} className="text-emerald-500 flex-shrink-0" />
-                    : <XCircle size={16} className="text-red-500 flex-shrink-0" />}
-                  <div>
-                    <p className="text-sm font-medium text-slate-700">{c.name}</p>
-                    {!c.ok && <p className="text-xs text-red-500">{c.detail}</p>}
-                  </div>
-                </div>
-                {c.count > 0 && (
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                    c.ok ? 'bg-slate-100 text-slate-500' : 'bg-red-100 text-red-600'
-                  }`}>
-                    {c.count}
-                  </span>
-                )}
+            {integrity.findings.length === 0 ? (
+              <div className="flex items-center gap-3 px-5 py-3">
+                <CheckCircle size={16} className="text-emerald-500 flex-shrink-0" />
+                <p className="text-sm font-medium text-slate-700">כל הבדיקות עברו בהצלחה</p>
               </div>
-            ))}
+            ) : (
+              integrity.findings.map(f => (
+                <div key={f.code} className="flex items-center justify-between px-5 py-3">
+                  <div className="flex items-center gap-3">
+                    {f.severity === 'error'
+                      ? <XCircle size={16} className="text-red-500 flex-shrink-0" />
+                      : <AlertTriangle size={16} className="text-amber-500 flex-shrink-0" />}
+                    <div>
+                      <p className="text-sm font-medium text-slate-700">{f.message}</p>
+                      <p className={`text-xs ${f.severity === 'error' ? 'text-red-500' : 'text-amber-600'}`}>
+                        {f.detail}
+                      </p>
+                    </div>
+                  </div>
+                  {f.count > 0 && (
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                      f.severity === 'error' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'
+                    }`}>
+                      {f.count}
+                    </span>
+                  )}
+                </div>
+              ))
+            )}
           </div>
         ) : null}
       </section>
