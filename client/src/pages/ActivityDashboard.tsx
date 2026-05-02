@@ -37,10 +37,13 @@ interface LiveStats {
 
 const MOCK_KINDERGARTENS = [
   'גן חבצלת', 'גן נרקיס', 'גן רקפת', 'גן כלנית', 'גן דליה',
+  'גן שושנה', 'גן תמר', 'גן אורית', 'גן ענבל', 'גן שקמה',
+  'גן אביבית', 'גן צבעוני',
 ];
 
 const MOCK_SUBS = [
   'מרים אברהם', 'רחל לוי', 'שרה כהן', 'לאה דוד',
+  'נועה פרידמן', 'דנה שמעוני', 'יעל ברק', 'תמר מזרחי',
 ];
 
 function generateMockFeed(): ActivityEvent[] {
@@ -55,7 +58,7 @@ function generateMockFeed(): ActivityEvent[] {
     { status: 'completed', verb: 'הושלם' },
   ];
 
-  for (let i = 0; i < 15; i++) {
+  for (let i = 0; i < 25; i++) {
     const minutesAgo = i * 12 + Math.floor(Math.random() * 10);
     const eventTime = new Date(now.getTime() - minutesAgo * 60_000);
     const action = actions[i % actions.length];
@@ -122,9 +125,9 @@ function generateMockFeed(): ActivityEvent[] {
 const MOCK_FEED = generateMockFeed();
 
 const MOCK_LIVE_STATS: LiveStats = {
-  assignmentsToday: { pending: 2, confirmed: 3, arrived: 1, completed: 1 },
-  absencesToday: { open: 1, assigned: 2 },
-  availableSubstitutes: 2,
+  assignmentsToday: { pending: 3, confirmed: 4, arrived: 2, completed: 3 },
+  absencesToday: { open: 1, assigned: 5 },
+  availableSubstitutes: 4,
   lastActivity: new Date().toISOString(),
 };
 

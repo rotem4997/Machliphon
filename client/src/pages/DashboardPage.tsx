@@ -54,18 +54,29 @@ interface AvailableSub {
 // ─── Mock data ──────────────────────────────────────────────
 
 const MOCK_KINDERGARTENS: Kindergarten[] = [
-  { id: 'kg-1', name: 'גן חבצלת', address: 'רחוב הרצל 15', neighborhood: 'מרכז', age_group: 'גן ילדים' },
-  { id: 'kg-2', name: 'גן נרקיס', address: 'רחוב ויצמן 8', neighborhood: 'צפון', age_group: 'גן ילדים' },
-  { id: 'kg-3', name: 'גן רקפת', address: 'שדרות בן גוריון 22', neighborhood: 'דרום', age_group: 'טרום חובה' },
-  { id: 'kg-4', name: 'גן כלנית', address: 'רחוב סוקולוב 3', neighborhood: 'מרכז', age_group: 'גן ילדים' },
-  { id: 'kg-5', name: 'גן דליה', address: 'רחוב ז׳בוטינסקי 11', neighborhood: 'מזרח', age_group: 'טרום חובה' },
+  { id: 'kg-1',  name: 'גן חבצלת',   address: 'רחוב הרצל 15',          neighborhood: 'מרכז',  age_group: 'גן ילדים'   },
+  { id: 'kg-2',  name: 'גן נרקיס',   address: 'רחוב ויצמן 8',           neighborhood: 'צפון',  age_group: 'גן ילדים'   },
+  { id: 'kg-3',  name: 'גן רקפת',    address: 'שדרות בן גוריון 22',      neighborhood: 'דרום',  age_group: 'טרום חובה'  },
+  { id: 'kg-4',  name: 'גן כלנית',   address: 'רחוב סוקולוב 3',          neighborhood: 'מרכז',  age_group: 'גן ילדים'   },
+  { id: 'kg-5',  name: 'גן דליה',    address: 'רחוב ז׳בוטינסקי 11',      neighborhood: 'מזרח',  age_group: 'טרום חובה'  },
+  { id: 'kg-6',  name: 'גן שושנה',   address: 'שדרות רוטשילד 5',         neighborhood: 'צפון',  age_group: 'גן ילדים'   },
+  { id: 'kg-7',  name: 'גן תמר',     address: 'רחוב אחד העם 17',         neighborhood: 'מערב',  age_group: 'גן ילדים'   },
+  { id: 'kg-8',  name: 'גן אורית',   address: 'רחוב ביאליק 9',           neighborhood: 'דרום',  age_group: 'גן ילדים'   },
+  { id: 'kg-9',  name: 'גן ענבל',    address: 'רחוב העצמאות 33',         neighborhood: 'מזרח',  age_group: 'טרום חובה'  },
+  { id: 'kg-10', name: 'גן שקמה',    address: 'שדרות ירושלים 44',        neighborhood: 'מרכז',  age_group: 'גן ילדים'   },
+  { id: 'kg-11', name: 'גן אביבית',  address: 'רחוב פינסקר 6',           neighborhood: 'מערב',  age_group: 'טרום חובה'  },
+  { id: 'kg-12', name: 'גן צבעוני',  address: 'רחוב האגוז 2',            neighborhood: 'צפון',  age_group: 'גן ילדים'   },
 ];
 
 const MOCK_AVAILABLE_SUBS: AvailableSub[] = [
-  { id: 'sub-1', first_name: 'מרים', last_name: 'אברהם', phone: '054-1234567', neighborhood: 'מרכז', education_level: 'תואר ראשון', years_experience: 3, total_assignments: 24 },
-  { id: 'sub-2', first_name: 'רחל', last_name: 'לוי', phone: '052-9876543', neighborhood: 'צפון', education_level: 'תואר שני', years_experience: 5, total_assignments: 42 },
-  { id: 'sub-3', first_name: 'שרה', last_name: 'כהן', phone: '050-5551234', neighborhood: 'דרום', education_level: 'סמינר', years_experience: 2, total_assignments: 15 },
-  { id: 'sub-4', first_name: 'לאה', last_name: 'דוד', phone: '053-7778899', neighborhood: 'מזרח', education_level: 'תואר ראשון', years_experience: 4, total_assignments: 31 },
+  { id: 'sub-1', first_name: 'מרים',   last_name: 'אברהם',   phone: '054-1234567', neighborhood: 'מרכז',  education_level: 'תואר ראשון', years_experience: 3, total_assignments: 47  },
+  { id: 'sub-2', first_name: 'רחל',    last_name: 'לוי',     phone: '052-9876543', neighborhood: 'צפון',  education_level: 'תואר שני',   years_experience: 7, total_assignments: 83  },
+  { id: 'sub-3', first_name: 'שרה',    last_name: 'כהן',     phone: '050-5551234', neighborhood: 'דרום',  education_level: 'סמינר',       years_experience: 2, total_assignments: 29  },
+  { id: 'sub-4', first_name: 'לאה',    last_name: 'דוד',     phone: '053-7778899', neighborhood: 'מזרח',  education_level: 'תואר ראשון', years_experience: 5, total_assignments: 61  },
+  { id: 'sub-5', first_name: 'נועה',   last_name: 'פרידמן',  phone: '054-6661234', neighborhood: 'מערב',  education_level: 'תואר שני',   years_experience: 4, total_assignments: 55  },
+  { id: 'sub-6', first_name: 'דנה',    last_name: 'שמעוני',  phone: '052-3334455', neighborhood: 'מרכז',  education_level: 'סמינר',       years_experience: 1, total_assignments: 18  },
+  { id: 'sub-7', first_name: 'יעל',    last_name: 'ברק',     phone: '050-9990011', neighborhood: 'צפון',  education_level: 'תואר ראשון', years_experience: 6, total_assignments: 72  },
+  { id: 'sub-8', first_name: 'תמר',    last_name: 'מזרחי',   phone: '053-1112233', neighborhood: 'דרום',  education_level: 'תואר שני',   years_experience: 3, total_assignments: 38  },
 ];
 
 function generateMockAssignments(): Assignment[] {
