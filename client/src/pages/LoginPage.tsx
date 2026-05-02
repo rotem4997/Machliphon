@@ -9,7 +9,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const { login, isLoading } = useAuthStore();
+  const { login, loginDemo, isLoading } = useAuthStore();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -24,11 +24,11 @@ export default function LoginPage() {
     }
   };
 
-  // Quick demo logins
-  const demoLogins = [
-    { label: 'מנהל רשות', email: 'director@yokneam.muni.il', color: 'bg-navy-900' },
-    { label: 'מדריכה', email: 'manager@yokneam.muni.il', color: 'bg-sky-500' },
-    { label: 'מחליפה', email: 'miriam@example.com', color: 'bg-mint-500' },
+  // Quick demo logins — bypass API entirely
+  const demoLogins: { label: string; role: 'authority_admin' | 'manager' | 'substitute'; color: string }[] = [
+    { label: 'מנהל רשות', role: 'authority_admin', color: 'bg-navy-900' },
+    { label: 'מדריכה',    role: 'manager',          color: 'bg-sky-500'  },
+    { label: 'מחליפה',    role: 'substitute',        color: 'bg-mint-500' },
   ];
 
   return (
@@ -112,8 +112,8 @@ export default function LoginPage() {
             <div className="grid grid-cols-3 gap-2">
               {demoLogins.map(d => (
                 <button
-                  key={d.email}
-                  onClick={() => { setEmail(d.email); setPassword('Demo1234!'); }}
+                  key={d.role}
+                  onClick={() => { loginDemo(d.role); navigate('/dashboard'); }}
                   className={`${d.color} text-white text-xs font-medium py-2 px-3 rounded-xl hover:opacity-90 transition-opacity`}
                 >
                   {d.label}

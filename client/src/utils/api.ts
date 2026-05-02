@@ -118,9 +118,19 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     if (error.response?.status === 401 && !originalRequest._retry) {
+      // Never log out a demo session — just swallow the 401
+      const stored = localStorage.getItem('machliphon-auth');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed.state?.token?.startsWith('demo-token-')) {
+            return Promise.reject(error);
+          }
+        } catch {}
+      }
+
       originalRequest._retry = true;
       try {
-        const stored = localStorage.getItem('machliphon-auth');
         if (stored) {
           const parsed = JSON.parse(stored);
           if (parsed.state?.refreshToken) {
