@@ -113,7 +113,13 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'machliphon-auth',
-      partialize: (state: AuthState) => ({ token: state.token, refreshToken: state.refreshToken, user: state.user }),
+      // Never persist demo sessions — they should last only for the browser session.
+      partialize: (state: AuthState) => {
+        if (state.token?.startsWith('demo-token-')) {
+          return { token: null, refreshToken: null, user: null };
+        }
+        return { token: state.token, refreshToken: state.refreshToken, user: state.user };
+      },
     }
   )
 );

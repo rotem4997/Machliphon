@@ -21,6 +21,18 @@ import ManagerKindergartensPage from './pages/ManagerKindergartensPage';
 import MLInsightsPage from './pages/MLInsightsPage';
 import { useAuthStore } from './context/authStore';
 
+// Clear any stale demo tokens left over from previous sessions.
+// Real tokens are never prefixed with "demo-token-" so this is safe.
+try {
+  const stored = localStorage.getItem('machliphon-auth');
+  if (stored) {
+    const parsed = JSON.parse(stored);
+    if (parsed?.state?.token?.startsWith('demo-token-')) {
+      localStorage.removeItem('machliphon-auth');
+    }
+  }
+} catch {}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
