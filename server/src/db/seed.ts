@@ -249,4 +249,6 @@ async function seed() {
   await pool.end();
 }
 
-seed().catch(console.error);
+if (require.main === module) {
+  seed().catch(console.error);
+}
