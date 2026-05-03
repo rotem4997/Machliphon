@@ -161,18 +161,6 @@ async function start() {
     console.error('Migration failed, starting server anyway:', err);
   }
 
-  try {
-    const { rows } = await (await import('./db/pool')).query('SELECT 1 FROM users LIMIT 1');
-    if (rows.length === 0) {
-      console.log('📦 Empty database — running seed...');
-      const { seedFull } = await import('./db/seed-full');
-      await seedFull();
-      console.log('✅ Seed complete');
-    }
-  } catch {
-    // table may not exist yet — migrations handle it on next attempt
-  }
-
   app.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`🚀 Machliphon server running on port ${PORT}`);
     console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
