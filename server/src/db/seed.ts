@@ -2,7 +2,28 @@ import bcrypt from 'bcryptjs';
 import { query } from './pool';
 import pool from './pool';
 
-async function seed() {
+export const DEMO_EMAILS = [
+  'admin@machliphon.co.il',
+  'director@yokneam.muni.il',
+  'manager@yokneam.muni.il',
+  'miriam@example.com',
+  'ruth@example.com',
+  'sarah@example.com',
+];
+
+export async function resetDemoPasswords() {
+  const hash = await bcrypt.hash('Demo1234!', 12);
+  const result = await query(
+    `UPDATE users SET password_hash = $1 WHERE email = ANY($2::text[])`,
+    [hash, DEMO_EMAILS],
+  );
+  if ((result.rowCount ?? 0) > 0) {
+    console.log(`🔑 Reset password for ${result.rowCount} demo account(s) → Demo1234!`);
+  }
+  return result.rowCount ?? 0;
+}
+
+export async function seedData() {
   console.log('🌱 Seeding database...');
 
   // 1. Authority
@@ -15,8 +36,7 @@ async function seed() {
 
   const authorityId = authorityResult.rows[0]?.id;
   if (!authorityId) {
-    console.log('Authority already exists, skipping...');
-    await pool.end();
+    console.log('ℹ️  Authority already exists, skipping seed.');
     return;
   }
 
@@ -146,7 +166,7 @@ async function seed() {
     INSERT INTO manager_kindergartens (manager_id, kindergarten_id) VALUES ($1, $2), ($1, $3)
   `, [managerId, kg1Id, kg2Id]);
 
-  // 7. Known absences (חופשים ידועים מראש)
+  // 7. Known absences
   const today = new Date();
   const nextMonth = new Date(today);
   nextMonth.setMonth(nextMonth.getMonth() + 1);
@@ -197,7 +217,6 @@ async function seed() {
     absence2.rows[0].id, sub2Id, kg2Id, fmt(today),
   ]);
 
-  // Update substitute total_assignments to match seeded data
   await query(`UPDATE substitutes SET total_assignments = 1 WHERE id = $1`, [sub1Id]);
 
   // 10. Substitute availability
@@ -222,7 +241,11 @@ async function seed() {
   console.log('  Substitute 1: miriam@example.com         / Demo1234!');
   console.log('  Substitute 2: ruth@example.com           / Demo1234!');
   console.log('  Substitute 3: sarah@example.com          / Demo1234!  (pending_approval)');
+}
 
+// CLI entry point: ts-node src/db/seed.ts
+async function seed() {
+  await seedData();
   await pool.end();
 }
 
