@@ -133,7 +133,7 @@ export async function predictNoShowRisk(
   authorityId: string,
   assignmentId: string,
   model?: LogRegModel,
-): Promise<{ score: number; band: 'low' | 'medium' | 'high'; features: Record<string, number> } | null> {
+): Promise<{ score: number; band: 'low' | 'medium' | 'high'; features: Record<string, number>; status: string } | null> {
   const r = await query(
     `SELECT a.id, a.substitute_id, a.kindergarten_id, a.assignment_date, a.status,
             a.rating, a.cancellation_reason, a.hours_worked, a.created_at,
@@ -212,5 +212,5 @@ export async function predictNoShowRisk(
   const band: 'low' | 'medium' | 'high' = score >= 0.5 ? 'high' : score >= 0.2 ? 'medium' : 'low';
   const featureMap: Record<string, number> = {};
   NO_SHOW_FEATURE_NAMES.forEach((n, i) => { featureMap[n] = feats[i]; });
-  return { score, band, features: featureMap };
+  return { score, band, features: featureMap, status: row.status };
 }

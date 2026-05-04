@@ -6,7 +6,7 @@ import { recommendSubstitutes, trainMatchModel } from '../ml/recommender';
 import { predictNoShowRisk, trainNoShowModel } from '../ml/noShowRisk';
 import { forecastDemand, trainDemandModels } from '../ml/demand';
 import { runIntegrityChecks } from '../ml/dataIntegrity';
-import { logPrediction, loadMatchModel, loadNoShowModel, loadDemandModel } from '../ml/modelStore';
+import { logPrediction, loadMatchModel, loadNoShowModel, loadDemandModel, StoredModel } from '../ml/modelStore';
 import { query } from '../db/pool';
 
 const router = Router();
@@ -22,23 +22,39 @@ function requireAuthorityScope(req: AuthRequest): string {
   return req.user.authority_id;
 }
 
+// In-flight training promises keyed by "authorityId:kind". Node.js is
+// single-threaded so the Map read+write pair is atomic across async tasks,
+// preventing duplicate parallel trains for the same (authority, kind).
+const trainingInFlight = new Map<string, Promise<void>>();
+
 // Auto-bootstrap a model the first time it's needed. If no snapshot exists in
 // ml_models for (authority, kind), train one inline so the recommender / risk /
 // forecast endpoints "just work" without requiring an explicit POST /train.
 // Errors are swallowed — the endpoint will fall back to its built-in heuristic.
-async function ensureTrained(authorityId: string, kind: 'match' | 'no_show' | 'demand') {
-  try {
-    const r = await query(
-      `SELECT 1 FROM ml_models WHERE authority_id = $1 AND kind = $2`,
-      [authorityId, kind],
-    );
-    if (r.rows.length > 0) return;
-    if (kind === 'match') await trainMatchModel(authorityId);
-    else if (kind === 'no_show') await trainNoShowModel(authorityId);
-    else await trainDemandModels(authorityId);
-  } catch (err) {
-    console.warn(`[ml] auto-train (${kind}) failed:`, err);
-  }
+function ensureTrained(authorityId: string, kind: 'match' | 'no_show' | 'demand'): Promise<void> {
+  const key = `${authorityId}:${kind}`;
+  const existing = trainingInFlight.get(key);
+  if (existing) return existing;
+
+  const promise = (async () => {
+    try {
+      const r = await query(
+        `SELECT 1 FROM ml_models WHERE authority_id = $1 AND kind = $2`,
+        [authorityId, kind],
+      );
+      if (r.rows.length > 0) return;
+      if (kind === 'match') await trainMatchModel(authorityId);
+      else if (kind === 'no_show') await trainNoShowModel(authorityId);
+      else await trainDemandModels(authorityId);
+    } catch (err) {
+      console.warn(`[ml] auto-train (${kind}) failed:`, err);
+    } finally {
+      trainingInFlight.delete(key);
+    }
+  })();
+
+  trainingInFlight.set(key, promise);
+  return promise;
 }
 
 // GET /api/ml/recommend?kindergartenId=...&date=YYYY-MM-DD&topK=10
@@ -92,15 +108,19 @@ router.get('/no-show-risk/:assignmentId',
         detail: `Assignment ${req.params.assignmentId} not found in authority ${authorityId}`,
       });
     }
-    await logPrediction({
-      authorityId,
-      kind: 'no_show',
-      subjectType: 'assignment',
-      subjectId: req.params.assignmentId,
-      score: result.score,
-      details: { band: result.band },
-    });
-    return res.json({ assignmentId: req.params.assignmentId, ...result });
+    const TERMINAL = new Set(['completed', 'no_show', 'cancelled']);
+    if (!TERMINAL.has(result.status)) {
+      await logPrediction({
+        authorityId,
+        kind: 'no_show',
+        subjectType: 'assignment',
+        subjectId: req.params.assignmentId,
+        score: result.score,
+        details: { band: result.band },
+      });
+    }
+    const { status: _s, ...resultPayload } = result;
+    return res.json({ assignmentId: req.params.assignmentId, ...resultPayload });
   }),
 );
 
@@ -203,7 +223,7 @@ router.get('/models', requireRole('manager', 'authority_admin', 'super_admin'),
       loadNoShowModel(authorityId),
       loadDemandModel(authorityId),
     ]);
-    const summarize = <P>(m: { kind: string; training_samples: number; metric_name: string | null; metric_value: number | null; feature_names: string[]; trained_at: string } & { params: P } | null) => m && {
+    const summarize = (m: StoredModel<unknown> | null) => m && {
       kind: m.kind,
       training_samples: m.training_samples,
       metric_name: m.metric_name,

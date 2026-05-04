@@ -5,6 +5,7 @@ import { query } from '../db/pool';
 import {
   DemandModel,
   DemandSeries,
+  dayOfWeek,
   predictDemand,
   trainDemandModel,
 } from './features';
@@ -133,7 +134,7 @@ export async function forecastDemand(
   authorityId: string,
   kindergartenId: string,
   daysAhead = 14,
-): Promise<{ kindergartenId: string; horizon: number; predictions: { date: string; expected: number }[] } | null> {
+): Promise<{ kindergartenId: string; horizon: number; predictions: { date: string; expected: number; low: number; high: number }[] } | null> {
   const r = await query(
     `SELECT params FROM ml_models WHERE authority_id = $1 AND kind = 'demand'`,
     [authorityId],
@@ -154,14 +155,21 @@ export async function forecastDemand(
 
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
-  const predictions: { date: string; expected: number }[] = [];
+  const predictions: { date: string; expected: number; low: number; high: number }[] = [];
   for (let i = 0; i < daysAhead; i++) {
     const d = new Date(today);
     d.setUTCDate(d.getUTCDate() + i);
     const dateStr = d.toISOString().slice(0, 10);
+    const expected = Math.max(0, predictDemand(kgModel, dateStr));
+    // Use stored per-dow std-dev when available; fall back to 30% envelope for
+    // models trained before perDowStd was added.
+    const dow = dayOfWeek(dateStr);
+    const stdDev = kgModel.perDowStd?.[dow] ?? expected * 0.3;
     predictions.push({
       date: dateStr,
-      expected: Math.max(0, predictDemand(kgModel, dateStr)),
+      expected,
+      low: Math.max(0, expected - stdDev),
+      high: expected + stdDev,
     });
   }
   return { kindergartenId, horizon: daysAhead, predictions };
