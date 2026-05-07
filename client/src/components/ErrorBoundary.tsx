@@ -44,10 +44,11 @@ export default class ErrorBoundary extends Component<Props, State> {
           {/* Message */}
           <h2 className="text-xl font-bold text-navy-900 mb-2">משהו השתבש</h2>
           <p className="text-slate-500 mb-8 leading-relaxed">
-            אירעה שגיאה בלתי צפויה. אנא נסי שוב מאוחר יותר.
+            אירעה שגיאה בלתי צפויה.<br />
+            ניתן לרענן את הדף ולנסות שוב, או לחזור מאוחר יותר.
           </p>
 
-          {/* Retry button */}
+          {/* Refresh button */}
           <button
             onClick={() => window.location.reload()}
             className="inline-flex items-center gap-2 px-8 py-3 bg-mint-500 text-white font-semibold rounded-xl shadow-sm hover:bg-mint-600 transition-colors"
@@ -56,7 +57,7 @@ export default class ErrorBoundary extends Component<Props, State> {
               <polyline points="23 4 23 10 17 10" />
               <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
             </svg>
-            נסי שוב
+            רענן דף
           </button>
         </div>
       </div>
