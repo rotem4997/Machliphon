@@ -4,8 +4,9 @@ import {
   BarChart3, Settings, LogOut, Bell, Menu, X, Activity,
   CalendarCheck, Building2, BookOpen, Brain,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthStore, UserRole } from '@/context/authStore';
+import api from '@/utils/api';
 import Logo from '@/components/Logo';
 
 const navItems: Record<UserRole, { href: string; label: string; icon: React.ReactNode }[]> = {
@@ -48,6 +49,18 @@ const navItems: Record<UserRole, { href: string; label: string; icon: React.Reac
 export default function AppLayout() {
   const { user, logout } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const fetchUnread = () => {
+      api.get('/notifications/unread-count')
+        .then(r => setUnreadCount(r.data.count || 0))
+        .catch(() => {});
+    };
+    fetchUnread();
+    const id = setInterval(fetchUnread, 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   if (!user) return null;
   const links = navItems[user.role] || navItems.manager;
@@ -141,6 +154,11 @@ export default function AppLayout() {
           </div>
           <button className="text-slate-600 relative">
             <Bell size={22} />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -left-1 min-w-[16px] h-4 px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
           </button>
         </header>
 
