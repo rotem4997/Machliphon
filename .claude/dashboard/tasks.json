@@ -15,18 +15,22 @@
     "title": "Search & filter substitutes by name / status",
     "description": "Add ?search=&status= query params to GET /api/substitutes. Frontend search input with debounce.",
     "priority": "high",
-    "status": "pending",
-    "assignedTo": null,
-    "createdAt": "2026-05-07T06:01:00.000Z"
+    "status": "done",
+    "assignedTo": "backend-developer",
+    "createdAt": "2026-05-07T06:01:00.000Z",
+    "updatedAt": "2026-05-07T18:26:06.681Z",
+    "completedAt": "2026-05-07T18:26:06.681Z"
   },
   {
     "id": "t003",
     "title": "Unread notification badge in nav",
     "description": "GET /api/notifications/unread-count. Show red badge on bell icon in AppLayout. Auto-poll every 30s.",
     "priority": "medium",
-    "status": "pending",
-    "assignedTo": null,
-    "createdAt": "2026-05-07T06:02:00.000Z"
+    "status": "done",
+    "assignedTo": "react-specialist",
+    "createdAt": "2026-05-07T06:02:00.000Z",
+    "updatedAt": "2026-05-07T18:26:44.257Z",
+    "completedAt": "2026-05-07T18:26:44.257Z"
   },
   {
     "id": "t004",
@@ -78,17 +82,21 @@
     "title": "Add global error boundary to React app",
     "description": "Wrap <App> in an ErrorBoundary that shows a Hebrew fallback UI instead of a blank screen.",
     "priority": "medium",
-    "status": "pending",
-    "assignedTo": null,
-    "createdAt": "2026-05-07T06:08:00.000Z"
+    "status": "done",
+    "assignedTo": "react-specialist",
+    "createdAt": "2026-05-07T06:08:00.000Z",
+    "updatedAt": "2026-05-07T18:25:41.712Z",
+    "completedAt": "2026-05-07T18:25:41.712Z"
   },
   {
     "id": "t010",
     "title": "Authority isolation security audit",
     "description": "Review all GET endpoints — verify every query filters by authority_id from JWT. Fix any gaps.",
     "priority": "high",
-    "status": "pending",
-    "assignedTo": null,
-    "createdAt": "2026-05-07T06:09:00.000Z"
+    "status": "done",
+    "assignedTo": "security-engineer",
+    "createdAt": "2026-05-07T06:09:00.000Z",
+    "updatedAt": "2026-05-07T18:25:41.721Z",
+    "completedAt": "2026-05-07T18:25:41.721Z"
   }
 ]

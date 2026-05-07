@@ -1,9 +1,9 @@
 {
   "team-lead": {
-    "status": "reviewing",
-    "task": "Committing t001 + dashboard work",
-    "progress": 90,
-    "updatedAt": "2026-05-07T18:24:06.376Z"
+    "status": "idle",
+    "task": "Pushed. Awaiting next task assignment.",
+    "progress": 0,
+    "updatedAt": "2026-05-07T18:34:53.702Z"
   },
   "feature-planner": {
     "status": "idle",
@@ -12,20 +12,21 @@
   },
   "backend-developer": {
     "status": "done",
-    "task": "✅ Pagination done — GET /api/substitutes",
+    "task": "✅ /api/notifications/unread-count already existed",
     "progress": 100,
-    "updatedAt": "2026-05-07T18:24:06.376Z"
+    "updatedAt": "2026-05-07T18:26:44.248Z"
   },
   "react-specialist": {
     "status": "done",
-    "task": "✅ SubstitutesPage pagination + AgentDashboard page",
+    "task": "✅ Notification badge wired to /api/notifications/unread-count, polls every 30s",
     "progress": 100,
-    "updatedAt": "2026-05-07T18:24:06.376Z"
+    "updatedAt": "2026-05-07T18:26:44.247Z"
   },
   "sql-pro": {
-    "status": "idle",
-    "task": "—",
-    "progress": 0
+    "status": "done",
+    "task": "✅ Root cause: authorities has no UNIQUE constraint — duplicate rows break authority scoping",
+    "progress": 100,
+    "updatedAt": "2026-05-07T18:33:41.914Z"
   },
   "api-designer": {
     "status": "idle",
@@ -38,9 +39,10 @@
     "progress": 0
   },
   "security-engineer": {
-    "status": "idle",
-    "task": "—",
-    "progress": 0
+    "status": "done",
+    "task": "✅ Audit complete — all routes correctly scoped, no gaps",
+    "progress": 100,
+    "updatedAt": "2026-05-07T18:25:41.703Z"
   },
   "code-reviewer": {
     "status": "idle",
@@ -55,7 +57,8 @@
   "debugger": {
     "status": "idle",
     "task": "—",
-    "progress": 0
+    "progress": 0,
+    "updatedAt": "2026-05-07T18:34:53.703Z"
   },
   "qa-expert": {
     "status": "idle",
