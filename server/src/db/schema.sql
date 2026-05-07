@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS authorities (
   contact_phone VARCHAR(20),
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT authorities_name_unique UNIQUE (name)
 );
 
 -- ============================================

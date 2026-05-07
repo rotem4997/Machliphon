@@ -30,6 +30,12 @@ export async function runMigrations() {
   // Make absence_id nullable (for direct assignments without an absence report)
   await query(`ALTER TABLE assignments ALTER COLUMN absence_id DROP NOT NULL`).catch(() => {});
 
+  // Add UNIQUE constraint on authorities.name to prevent duplicate authority rows
+  // which would break authority-scoped queries for all roles.
+  await query(`
+    ALTER TABLE authorities ADD CONSTRAINT authorities_name_unique UNIQUE (name)
+  `).catch(() => {}); // catch: constraint may already exist
+
   // Add teaching_license_url column if missing
   await query(`ALTER TABLE substitutes ADD COLUMN IF NOT EXISTS teaching_license_url VARCHAR(500)`).catch(() => {});
 

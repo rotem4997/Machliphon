@@ -26,17 +26,17 @@ export async function resetDemoPasswords() {
 export async function seedData() {
   console.log('🌱 Seeding database...');
 
-  // 1. Authority
+  // 1. Authority — upsert so re-running seed always recovers the same UUID
   const authorityResult = await query(`
     INSERT INTO authorities (name, city, district, contact_name, contact_email, contact_phone)
     VALUES ($1, $2, $3, $4, $5, $6)
-    ON CONFLICT DO NOTHING
+    ON CONFLICT (name) DO UPDATE SET updated_at = NOW()
     RETURNING id
   `, ['עיריית יקנעם עילית', 'יקנעם עילית', 'חיפה', 'שרה לוי', 'education@yokneam.muni.il', '04-9888100']);
 
   const authorityId = authorityResult.rows[0]?.id;
   if (!authorityId) {
-    console.log('ℹ️  Authority already exists, skipping seed.');
+    console.log('⚠️  Could not resolve authority ID, aborting seed.');
     return;
   }
 
