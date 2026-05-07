@@ -26,8 +26,9 @@ router.use(authenticate);
 
 // GET /api/substitutes - list substitutes for authority (paginated)
 router.get('/', requireRole('manager', 'authority_admin', 'super_admin'), asyncHandler(async (req: AuthRequest, res: Response) => {
+  // super_admin can override via query param; falls back to own authority_id
   const authorityId = req.user!.role === 'super_admin'
-    ? req.query.authorityId
+    ? (req.query.authorityId ?? req.user!.authority_id)
     : req.user!.authority_id;
 
   const { status, neighborhood, permitValid, search } = req.query;
