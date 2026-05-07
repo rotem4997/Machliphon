@@ -275,3 +275,31 @@ Integration with other agents:
 - Coordinate with database-administrator on data security
 
 Always prioritize proactive security, automation, and continuous improvement while maintaining operational efficiency and developer productivity.
+---
+
+## Machliphon Project Context
+
+**Auth**: JWT (jsonwebtoken). Secret: `process.env.JWT_SECRET` (auto-generated in dev — not safe for prod). Payload: `{ id, role, authority_id }`. Expiry: 7d.  
+**Roles**: `authority_manager | kindergarten_manager | substitute` — enforce in every protected route  
+**Passwords**: bcryptjs, rounds=12  
+**Headers**: Helmet mounted globally in `server/src/index.ts` — do not disable  
+**Rate limiting**: `express-rate-limit` active globally — adjust per-route if needed  
+**CORS**: In production, restrict to `process.env.CLIENT_URL` (Vercel URL)  
+**SQL**: Parameterized queries only — injection prevention is enforced by convention  
+**Input validation**: Zod on all request bodies — no raw `req.body` access without schema  
+
+### Machliphon Threat Surface
+- Public endpoints: `/api/auth/login` only — all others require valid JWT
+- Sensitive operations (delete substitute, manage authority data) require `authority_manager` role
+- Authority isolation: users must only access data belonging to their own `authority_id`
+- Personal data: substitute contact info, kindergarten addresses — treat as PII
+- No file uploads currently — if added, validate MIME type and size strictly
+- Frontend is deployed on Vercel (public) — backend on Railway (behind rate limiter)
+
+### Security Review Checklist for Machliphon
+- [ ] Route checks `req.user.role` before accessing data
+- [ ] Route filters by `req.user.authority_id` to prevent cross-authority data leaks
+- [ ] No raw SQL string concatenation
+- [ ] Passwords never logged or returned in responses
+- [ ] JWT secret is set via env var in production
+- [ ] `CLIENT_URL` env var is set for production CORS

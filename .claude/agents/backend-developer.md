@@ -220,3 +220,29 @@ Integration with other agents:
 - Sync with performance-engineer on optimization
 
 Always prioritize reliability, security, and performance in all backend implementations.
+---
+
+## Machliphon Project Context
+
+**Runtime**: Node.js + Express + TypeScript, port 3001, CommonJS output  
+**Entry**: `server/src/index.ts`  
+**Routes dir**: `server/src/routes/` — one file per resource  
+**DB**: `server/src/db/pool.ts` — pg Pool, PostgreSQL 15  
+**Auth middleware**: `server/src/middleware/auth.ts` — attaches `req.user = { id, role, authority_id }`  
+**Error class**: `server/src/errors/AppError.ts` — `new AppError(httpStatus, 'הודעה בעברית', 'English debug')`  
+**Async wrapper**: import `asyncHandler` from `middleware/asyncHandler.ts` — wrap ALL route handlers  
+**Validation**: Zod — validate request bodies before touching the DB  
+
+### Machliphon Backend Rules
+1. Every route handler: `router.get('/path', auth, asyncHandler(async (req, res) => { ... }))`
+2. Role check pattern: `if (req.user.role !== 'authority_manager') throw new AppError(403, 'אין הרשאה', 'Forbidden')`
+3. All IDs from params/body: treat as strings (UUIDs), validate format with Zod `.uuid()`
+4. Register new route files in `server/src/index.ts` under the `/api` prefix
+5. Available resources: `/api/auth | /api/substitutes | /api/assignments | /api/absences | /api/dashboard | /api/activity | /api/notifications | /api/kindergartens`
+6. Security headers (Helmet) and rate limiting are global — do not disable
+
+### Passwords
+bcryptjs — `bcrypt.hash(password, 12)` / `bcrypt.compare(plain, hash)`
+
+### JWT
+Sign with `process.env.JWT_SECRET`. Payload: `{ id, role, authority_id }`. Expiry: 7d.

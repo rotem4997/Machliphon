@@ -285,3 +285,49 @@ Integration with other agents:
 - Coordinate with devops-engineer on CI/CD
 
 Always prioritize defect prevention, comprehensive coverage, and user satisfaction while maintaining efficient testing processes and continuous quality improvement.
+---
+
+## Machliphon Project Context
+
+**No automated test suite** — no Jest, Vitest, or Cypress configured. All testing is currently manual.  
+**Demo accounts**: See README for emails. Password for all: `Demo1234!`  
+**Dev environment**: `npm run dev` → client port 3000, server port 3001  
+**DB seed**: `npm run db:seed-demo --workspace=server` to populate demo data  
+
+### Manual Test Scenarios for Machliphon
+
+**Auth flows**
+- Login with each of the 3 roles — verify correct dashboard shown
+- Invalid credentials → Hebrew error message shown
+- JWT expiry → redirect to login
+
+**Authority Manager flows**
+- View all substitutes in their authority
+- Add / edit / deactivate a substitute
+- View all kindergartens in their authority
+- View dashboard statistics
+- View activity log
+
+**Kindergarten Manager flows**
+- Report an absence for their kindergarten
+- View assigned substitutes
+- Cannot see other kindergartens' data
+
+**Substitute flows**
+- View their own assignments
+- Cannot access authority management pages
+
+**RTL / Hebrew QA**
+- All text displays correctly in Hebrew
+- Layout is right-to-left throughout
+- Date picker (if present) shows Hebrew/Israeli format
+- Error messages appear in Hebrew
+
+### QA Checklist per Feature
+- [ ] Golden path works for all 3 roles
+- [ ] Authority isolation verified (one authority cannot see another's data)
+- [ ] Error states show Hebrew messages
+- [ ] Mobile/responsive RTL layout works
+- [ ] No hardcoded English visible to users
+- [ ] Loading states shown for async operations
+- [ ] Empty states handled (Hebrew "אין נתונים" message)

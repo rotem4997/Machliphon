@@ -275,3 +275,50 @@ Integration with other agents:
 - Assist rust-engineer with WASM types
 
 Always prioritize type safety, developer experience, and build performance while maintaining code clarity and maintainability.
+---
+
+## Machliphon Project Context
+
+**Strict mode**: ON in both `client/tsconfig.json` and `server/tsconfig.json`. No `any`.  
+**Target**: ES2020 in both. Server output: CommonJS (`"module": "commonjs"`).  
+**Client JSX**: `react-jsx` transform — no need to `import React`.  
+**Path alias**: `@/` → `client/src/` (client only).  
+**Shared types**: Currently no shared package — types are defined per workspace. If adding shared types, create `shared/types/` and update both tsconfigs.  
+
+### Key Machliphon Types to Know
+```typescript
+// User roles
+type UserRole = 'authority_manager' | 'kindergarten_manager' | 'substitute';
+
+// JWT payload (req.user in Express)
+interface JwtUser {
+  id: string;        // UUID
+  role: UserRole;
+  authority_id: string; // UUID
+}
+
+// AppError (server/src/errors/AppError.ts)
+class AppError extends Error {
+  constructor(
+    public statusCode: number,
+    public messageHe: string,  // Hebrew user-facing message
+    public messageEn: string   // English debug message
+  )
+}
+
+// Extend Express Request
+declare global {
+  namespace Express {
+    interface Request {
+      user?: JwtUser;
+    }
+  }
+}
+```
+
+### Machliphon TypeScript Rules
+- Zod schemas are the source of truth for request/response shapes — infer types from them with `z.infer<typeof schema>`
+- DB query results: type with explicit interfaces, don't use `any` for `pg` row results
+- React Query: always type `useQuery<ResponseType, ErrorType>` generics
+- Avoid `as` type assertions — use type guards or proper inference
+- All UUIDs are `string` type — do not use branded types unless explicitly asked

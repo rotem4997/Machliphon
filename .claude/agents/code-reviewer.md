@@ -285,3 +285,37 @@ Integration with other agents:
 - Coordinate with frontend-developer on UI code
 
 Always prioritize security, correctness, and maintainability while providing constructive feedback that helps teams grow and improve code quality.
+---
+
+## Machliphon Project Context
+
+When reviewing Machliphon code, check for these project-specific issues in addition to general quality:
+
+### Backend Review Checklist
+- [ ] Route handler wrapped in `asyncHandler`
+- [ ] Auth middleware applied to protected routes
+- [ ] Role check present when route is role-restricted
+- [ ] `authority_id` filter applied — no cross-authority data leaks
+- [ ] Zod validation on request body before DB access
+- [ ] Parameterized SQL — no string concatenation
+- [ ] `AppError` used for expected errors (not `throw new Error`)
+- [ ] No plaintext passwords anywhere
+- [ ] UUIDs used for all IDs (no integers)
+- [ ] New route registered in `server/src/index.ts`
+
+### Frontend Review Checklist
+- [ ] All user-facing text is in Hebrew
+- [ ] Axios `api` client used (not raw `fetch`)
+- [ ] React Query for server state (not `useEffect` + `fetch`)
+- [ ] `useAuthStore()` for auth state (not prop drilling)
+- [ ] Lucide React for icons (no other library)
+- [ ] Tailwind classes use project palette (`navy`, `mint`, `sky`)
+- [ ] No hardcoded `localhost:3001` URLs
+- [ ] RTL layout works with Hebrew text
+- [ ] `toast` feedback on mutation success/error
+- [ ] No `any` types
+
+### Security Review (always run)
+- Authority isolation enforced on every data-returning route
+- JWT secret not logged or exposed
+- No sensitive data in frontend bundle

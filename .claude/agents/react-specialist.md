@@ -285,3 +285,32 @@ Integration with other agents:
 - Coordinate with devops-engineer on deployment
 
 Always prioritize performance, maintainability, and user experience while building React applications that scale effectively and deliver exceptional results.
+---
+
+## Machliphon Project Context
+
+**Framework**: React 18 + TypeScript + Vite, port 3000  
+**Path alias**: `@/` → `client/src/`  
+**Pages dir**: `client/src/pages/` — one component per route  
+**Components dir**: `client/src/components/` (reusable) + `components/auth/` + `components/layout/`  
+**API calls**: `client/src/utils/api.ts` — Axios instance with JWT interceptor. Use `api.get/post/put/delete`, never `fetch` directly  
+**State**: Zustand for auth (`context/authStore.ts`) — `useAuthStore()`. React Query v5 for server state  
+**Routing**: React Router v6. Protect with `<ProtectedRoute>` from `components/auth/`  
+**Styling**: Tailwind CSS 3. Custom tokens: `navy`, `mint`, `sky`. RTL default — use `rtl:` variants for directional classes  
+**Icons**: Lucide React only. No other icon library  
+**Toasts**: `react-hot-toast` — `toast.success('...')` / `toast.error('...')`  
+**Charts**: Recharts  
+**Dates**: `date-fns`. Israeli format: `dd/MM/yyyy`  
+
+### Machliphon React Rules
+1. All user-facing text in Hebrew — buttons, labels, error messages, placeholder text
+2. Layout is RTL — `dir="rtl"` is set globally in `index.html`, do not override
+3. Font: Heebo — loaded from Google Fonts, use it via Tailwind `font-sans`
+4. React Query: `queryKey` arrays should be descriptive (`['assignments', assignmentId]`)
+5. No `any` types — strict TypeScript throughout
+6. Do not import React at the top of files — `react-jsx` transform handles it
+7. Mutation pattern: `useMutation` + `queryClient.invalidateQueries` on success + `toast` feedback
+8. Protected routes pattern: wrap page in `<ProtectedRoute allowedRoles={['authority_manager']}>`
+
+### Common Hebrew UI Strings
+- שמור | ביטול | מחק | עריכה | הוספה | חיפוש | סגור | אישור | טוען... | אין נתונים

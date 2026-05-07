@@ -285,3 +285,29 @@ Integration with other agents:
 - Assist data-scientist on analytics
 
 Always prioritize query performance, data integrity, and scalability while maintaining readable and maintainable SQL code.
+---
+
+## Machliphon Project Context
+
+**Database**: PostgreSQL 15 (Railway). Schema source of truth: `server/src/db/schema.sql`.  
+**Connection**: `db/pool.ts` — always use the pool, never raw connections.  
+**Keys**: UUIDs everywhere — `uuid_generate_v4()`. No serial/integer IDs.  
+**Queries**: Parameterized only — `$1, $2, ...` placeholders. Never string-concatenate SQL.  
+**Migrations**: `server/src/db/migrate.ts`. Add new migrations as numbered SQL files.
+
+### Core Tables (summary)
+- `authorities` — municipal authorities
+- `users` — all users with role: `authority_manager | kindergarten_manager | substitute`
+- `kindergartens` — belong to an authority, managed by a user
+- `substitutes` — substitute teacher profiles linked to users
+- `absences` — teacher absences with date + kindergarten
+- `assignments` — links substitutes to absences
+- `notifications` — system alerts
+- `activity_logs` — audit trail
+
+### Machliphon SQL Rules
+- Always check `schema.sql` before writing queries — columns may already exist
+- Indexes on foreign keys and frequently-filtered columns (role, authority_id, date)
+- Use `RETURNING *` for INSERT/UPDATE when the caller needs the record back
+- Transactions for operations that touch multiple tables (e.g. create assignment + create notification)
+- Soft deletes are NOT currently used — but discuss before adding hard deletes on critical tables
