@@ -19,7 +19,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
       throw new AuthenticationError('אין הרשאה. נדרשת כניסה למערכת.', {
-        source: `${req.method} ${req.path}`,
+        source: `${req.method} ${req.originalUrl}`,
         detail: 'Missing or malformed Authorization header',
       });
     }
@@ -42,7 +42,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
 
     if (result.rows.length === 0) {
       throw new AuthenticationError('משתמש לא נמצא או אינו פעיל.', {
-        source: `${req.method} ${req.path}`,
+        source: `${req.method} ${req.originalUrl}`,
         detail: `User ${decoded.userId} not found or inactive`,
       });
     }
@@ -52,13 +52,13 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {
       return next(new AuthenticationError('טוקן לא תקין.', {
-        source: `${req.method} ${req.path}`,
+        source: `${req.method} ${req.originalUrl}`,
         detail: `JWT error: ${error.message}`,
       }));
     }
     if (error instanceof jwt.TokenExpiredError) {
       return next(new AuthenticationError('פג תוקף הכניסה. נדרשת כניסה מחדש.', {
-        source: `${req.method} ${req.path}`,
+        source: `${req.method} ${req.originalUrl}`,
         detail: 'Token expired',
       }));
     }
@@ -70,13 +70,13 @@ export const requireRole = (...roles: string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
       return next(new AuthenticationError('לא מחובר.', {
-        source: `${req.method} ${req.path}`,
+        source: `${req.method} ${req.originalUrl}`,
         detail: 'No user on request (authenticate middleware missing?)',
       }));
     }
     if (!roles.includes(req.user.role)) {
       return next(new ForbiddenError('אין הרשאה לבצע פעולה זו.', {
-        source: `${req.method} ${req.path}`,
+        source: `${req.method} ${req.originalUrl}`,
         detail: `User role "${req.user.role}" not in allowed roles: ${roles.join(', ')}`,
         meta: { userId: req.user.id, userRole: req.user.role, requiredRoles: roles },
       }));
