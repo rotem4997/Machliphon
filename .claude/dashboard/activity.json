@@ -1,5 +1,161 @@
 [
   {
+    "agent": "deployment-engineer",
+    "event": "status",
+    "status": "done",
+    "task": "✅ All commits pushed to main — Vercel deploy triggered",
+    "progress": 100,
+    "ts": "2026-05-07T19:15:00.000Z"
+  },
+  {
+    "agent": "team-lead",
+    "event": "status",
+    "status": "done",
+    "task": "✅ Sprint complete — t006, t007, t008 shipped. Pushing to main.",
+    "progress": 100,
+    "ts": "2026-05-07T19:14:00.000Z"
+  },
+  {
+    "agent": "react-specialist",
+    "event": "task_done",
+    "title": "Kindergarten detail page",
+    "ts": "2026-05-07T19:10:00.000Z"
+  },
+  {
+    "agent": "react-specialist",
+    "event": "task_done",
+    "title": "Assignment history page per substitute",
+    "ts": "2026-05-07T19:10:00.000Z"
+  },
+  {
+    "agent": "react-specialist",
+    "event": "task_done",
+    "title": "Mark substitute as unavailable for date range",
+    "ts": "2026-05-07T19:10:00.000Z"
+  },
+  {
+    "agent": "react-specialist",
+    "event": "status",
+    "status": "done",
+    "task": "✅ UnavailabilityModal + SubstituteHistoryPage + KindergartenDetailPage + App.tsx routes all wired",
+    "progress": 100,
+    "ts": "2026-05-07T19:10:00.000Z"
+  },
+  {
+    "agent": "backend-developer",
+    "event": "task_done",
+    "title": "Kindergarten detail page",
+    "ts": "2026-05-07T19:05:00.000Z"
+  },
+  {
+    "agent": "backend-developer",
+    "event": "task_done",
+    "title": "Assignment history page per substitute",
+    "ts": "2026-05-07T19:05:00.000Z"
+  },
+  {
+    "agent": "backend-developer",
+    "event": "task_done",
+    "title": "Mark substitute as unavailable for date range",
+    "ts": "2026-05-07T19:05:00.000Z"
+  },
+  {
+    "agent": "team-lead",
+    "event": "status",
+    "status": "working",
+    "task": "Vercel branch gap identified — awaiting user decision on merge to main",
+    "progress": 50,
+    "ts": "2026-05-07T18:43:35.458Z"
+  },
+  {
+    "agent": "react-specialist",
+    "event": "status",
+    "status": "working",
+    "task": "Building t006 unavailability modal in SubstitutesPage",
+    "progress": 5,
+    "ts": "2026-05-07T18:43:35.457Z"
+  },
+  {
+    "agent": "backend-developer",
+    "event": "status",
+    "status": "done",
+    "task": "✅ t006 unavailability routes, t007 history endpoint, t008 kindergarten detail — all written",
+    "progress": 100,
+    "ts": "2026-05-07T18:43:35.457Z"
+  },
+  {
+    "agent": "backend-developer",
+    "event": "task_in-progress",
+    "title": "Kindergarten detail page",
+    "ts": "2026-05-07T18:40:02.801Z"
+  },
+  {
+    "agent": "backend-developer",
+    "event": "task_in-progress",
+    "title": "Assignment history page per substitute",
+    "ts": "2026-05-07T18:40:02.791Z"
+  },
+  {
+    "agent": "backend-developer",
+    "event": "task_in-progress",
+    "title": "Mark substitute as unavailable for date range",
+    "ts": "2026-05-07T18:40:02.782Z"
+  },
+  {
+    "agent": "react-specialist",
+    "event": "status",
+    "status": "working",
+    "task": "Building t006 + t007 + t008 frontend pages",
+    "progress": 5,
+    "ts": "2026-05-07T18:40:02.772Z"
+  },
+  {
+    "agent": "backend-developer",
+    "event": "status",
+    "status": "working",
+    "task": "Building t006 + t007 + t008 backend endpoints",
+    "progress": 5,
+    "ts": "2026-05-07T18:40:02.771Z"
+  },
+  {
+    "agent": "feature-planner",
+    "event": "status",
+    "status": "done",
+    "task": "✅ Plans ready for t006/t007/t008 — delegating to specialists",
+    "progress": 100,
+    "ts": "2026-05-07T18:40:02.771Z"
+  },
+  {
+    "agent": "feature-planner",
+    "event": "status",
+    "status": "working",
+    "task": "Planning t006, t007, t008 in parallel",
+    "progress": 10,
+    "ts": "2026-05-07T18:39:38.578Z"
+  },
+  {
+    "agent": "feature-planner",
+    "event": "status",
+    "status": "working",
+    "task": "Planning t006: substitute unavailability date range",
+    "progress": 5,
+    "ts": "2026-05-07T18:39:06.788Z"
+  },
+  {
+    "agent": "team-lead",
+    "event": "status",
+    "status": "working",
+    "task": "Invoking feature-planner for t006 + t007 + t008",
+    "progress": 10,
+    "ts": "2026-05-07T18:39:06.787Z"
+  },
+  {
+    "agent": "react-specialist",
+    "event": "task_done",
+    "title": "Export substitutes list to CSV",
+    "ts": "2026-05-07T18:39:06.778Z"
+  },
+  {
     "agent": "debugger",
     "event": "status",
     "status": "idle",

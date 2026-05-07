@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import {
   Search, Plus, Phone, Mail, MapPin, CheckCircle, XCircle,
   Clock, GraduationCap, CreditCard, Download, X, Upload, UserCheck, AlertCircle,
+  CalendarX, Trash2, History,
 } from 'lucide-react';
 import api from '@/utils/api';
 import toast from 'react-hot-toast';
@@ -94,6 +96,7 @@ export default function SubstitutesPage() {
   const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
   const [selectedSub, setSelectedSub] = useState<Substitute | null>(null);
+  const [unavailTarget, setUnavailTarget] = useState<Substitute | null>(null);
   const [rejectTarget, setRejectTarget] = useState<Substitute | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [permitTarget, setPermitTarget] = useState<Substitute | null>(null);
@@ -438,6 +441,18 @@ export default function SubstitutesPage() {
             if (confirm('לאשר מחליפה זו?')) approveMutation.mutate(sub.id);
             setSelectedSub(null);
           }}
+          onUnavailability={sub => {
+            setSelectedSub(null);
+            setUnavailTarget(sub);
+          }}
+        />
+      )}
+
+      {/* Unavailability Modal */}
+      {unavailTarget && (
+        <UnavailabilityModal
+          sub={unavailTarget}
+          onClose={() => setUnavailTarget(null)}
         />
       )}
     </div>
@@ -649,7 +664,18 @@ function CreateSubstituteModal({ onClose, onSuccess }: { onClose: () => void; on
 }
 
 /* ────── Substitute Detail Modal ────── */
-function SubstituteDetailModal({ sub, onClose, onApprove }: { sub: Substitute; onClose: () => void; onApprove: (sub: Substitute) => void }) {
+function SubstituteDetailModal({
+  sub,
+  onClose,
+  onApprove,
+  onUnavailability,
+}: {
+  sub: Substitute;
+  onClose: () => void;
+  onApprove: (sub: Substitute) => void;
+  onUnavailability: (sub: Substitute) => void;
+}) {
+  const navigate = useNavigate();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="card p-6 w-full max-w-md slide-in max-h-[90vh] overflow-y-auto">
@@ -742,7 +768,7 @@ function SubstituteDetailModal({ sub, onClose, onApprove }: { sub: Substitute; o
           </div>
         </div>
 
-        <div className="flex gap-2 mt-4">
+        <div className="flex flex-wrap gap-2 mt-4">
           {sub.status === 'pending_approval' && (
             <button
               onClick={() => onApprove(sub)}
@@ -752,7 +778,21 @@ function SubstituteDetailModal({ sub, onClose, onApprove }: { sub: Substitute; o
               אשר מחליפה
             </button>
           )}
-          <button onClick={onClose} className={`btn-secondary ${sub.status === 'pending_approval' ? '' : 'w-full'}`}>סגור</button>
+          <button
+            onClick={() => onUnavailability(sub)}
+            className="btn-secondary flex items-center gap-1.5 text-sm"
+          >
+            <CalendarX size={15} />
+            סמן חופשה
+          </button>
+          <button
+            onClick={() => { onClose(); navigate(`/substitutes/${sub.id}/history`); }}
+            className="btn-secondary flex items-center gap-1.5 text-sm"
+          >
+            <History size={15} />
+            היסטוריה מלאה
+          </button>
+          <button onClick={onClose} className="btn-secondary text-sm">סגור</button>
         </div>
       </div>
     </div>
@@ -767,6 +807,182 @@ function DetailRow({ icon: Icon, label, value }: { icon: typeof Phone; label: st
       <div className="flex-1 min-w-0">
         <p className="text-xs text-slate-500">{label}</p>
         <p className="text-sm font-medium text-navy-900 truncate">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+/* ────── Unavailability Modal ────── */
+interface UnavailabilityEntry {
+  id: string;
+  date: string;
+  reason: string;
+}
+
+const REASON_LABELS: Record<string, string> = {
+  חופשה: 'חופשה',
+  מחלה: 'מחלה',
+  אישי: 'אישי',
+  הדרכה: 'הדרכה',
+  אחר: 'אחר',
+};
+
+function UnavailabilityModal({ sub, onClose }: { sub: Substitute; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [reason, setReason] = useState('חופשה');
+  const [formError, setFormError] = useState('');
+
+  const { data: entries = [], isLoading } = useQuery<UnavailabilityEntry[]>({
+    queryKey: ['unavailability', sub.id],
+    queryFn: () => api.get(`/substitutes/${sub.id}/unavailability`).then(r => r.data),
+  });
+
+  const addMutation = useMutation({
+    mutationFn: (body: { fromDate: string; toDate: string; reason: string }) =>
+      api.post(`/substitutes/${sub.id}/unavailability`, body),
+    onSuccess: () => {
+      toast.success('החופשה נוספה בהצלחה');
+      setFromDate('');
+      setToDate('');
+      setReason('חופשה');
+      queryClient.invalidateQueries({ queryKey: ['unavailability', sub.id] });
+      queryClient.invalidateQueries({ queryKey: ['substitutes'] });
+    },
+    onError: (err: any) => {
+      const msg = err.response?.data?.error;
+      toast.error(typeof msg === 'string' ? msg : 'שגיאה בהוספת החופשה');
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (date: string) =>
+      api.delete(`/substitutes/${sub.id}/unavailability`, { data: { fromDate: date, toDate: date } }),
+    onSuccess: () => {
+      toast.success('תאריך הוסר');
+      queryClient.invalidateQueries({ queryKey: ['unavailability', sub.id] });
+      queryClient.invalidateQueries({ queryKey: ['substitutes'] });
+    },
+    onError: () => toast.error('שגיאה בהסרת התאריך'),
+  });
+
+  const handleAdd = (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError('');
+    if (!fromDate || !toDate) {
+      setFormError('יש למלא תאריך התחלה וסיום');
+      return;
+    }
+    if (toDate < fromDate) {
+      setFormError('תאריך סיום חייב להיות גדול או שווה לתאריך התחלה');
+      return;
+    }
+    addMutation.mutate({ fromDate, toDate, reason });
+  };
+
+  const formatDate = (dateStr: string) =>
+    new Date(dateStr).toLocaleDateString('he-IL');
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="card p-6 w-full max-w-md slide-in max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-bold text-navy-900 text-lg">ניהול חופשות</h3>
+            <p className="text-sm text-slate-500">{sub.first_name} {sub.last_name}</p>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-lg">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Existing entries */}
+        <div className="mb-5">
+          <h4 className="text-sm font-semibold text-navy-900 mb-2">תאריכים קיימים</h4>
+          {isLoading ? (
+            <div className="h-12 skeleton rounded-lg" />
+          ) : entries.length === 0 ? (
+            <p className="text-sm text-slate-400 py-3 text-center">אין תאריכים מוגדרים</p>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {entries.map(entry => (
+                <li key={entry.id} className="flex items-center justify-between py-2.5 gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <CalendarX size={14} className="text-slate-400 flex-shrink-0" />
+                    <span className="text-sm font-medium text-navy-900">{formatDate(entry.date)}</span>
+                    <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
+                      {REASON_LABELS[entry.reason] ?? entry.reason}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => deleteMutation.mutate(entry.date)}
+                    disabled={deleteMutation.isPending}
+                    className="text-slate-300 hover:text-red-400 transition-colors flex-shrink-0"
+                    title="הסר תאריך"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Add form */}
+        <div className="border-t border-slate-100 pt-4">
+          <h4 className="text-sm font-semibold text-navy-900 mb-3">הוספת חופשה</h4>
+          <form onSubmit={handleAdd} className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">מתאריך *</label>
+                <input
+                  type="date"
+                  className="input text-sm"
+                  value={fromDate}
+                  onChange={e => { setFromDate(e.target.value); setFormError(''); }}
+                />
+              </div>
+              <div>
+                <label className="label">עד תאריך *</label>
+                <input
+                  type="date"
+                  className="input text-sm"
+                  value={toDate}
+                  min={fromDate || undefined}
+                  onChange={e => { setToDate(e.target.value); setFormError(''); }}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="label">סיבה</label>
+              <select className="input text-sm" value={reason} onChange={e => setReason(e.target.value)}>
+                <option value="חופשה">חופשה</option>
+                <option value="מחלה">מחלה</option>
+                <option value="אישי">אישי</option>
+                <option value="הדרכה">הדרכה</option>
+                <option value="אחר">אחר</option>
+              </select>
+            </div>
+            {formError && (
+              <p className="text-xs text-red-500 flex items-center gap-1">
+                <AlertCircle size={13} />
+                {formError}
+              </p>
+            )}
+            <div className="flex gap-2 justify-end pt-1">
+              <button type="button" onClick={onClose} className="btn-secondary text-sm">סגור</button>
+              <button
+                type="submit"
+                disabled={addMutation.isPending}
+                className="btn-primary text-sm flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <Plus size={15} />
+                {addMutation.isPending ? 'שומר...' : 'הוסף'}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );

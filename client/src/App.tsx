@@ -18,6 +18,8 @@ import ProfilePage from './pages/ProfilePage';
 import AvailabilityPage from './pages/AvailabilityPage';
 import KnownAbsencesPage from './pages/KnownAbsencesPage';
 import ManagerKindergartensPage from './pages/ManagerKindergartensPage';
+import SubstituteHistoryPage from './pages/SubstituteHistoryPage';
+import KindergartenDetailPage from './pages/KindergartenDetailPage';
 import MLInsightsPage from './pages/MLInsightsPage';
 import AgentDashboard from './pages/AgentDashboard';
 import { useAuthStore } from './context/authStore';
@@ -71,6 +73,7 @@ export default function App() {
                 }
               >
                 <Route index element={<SubstitutesPage />} />
+                <Route path=":id/history" element={<SubstituteHistoryPage />} />
               </Route>
               <Route path="/assignments" element={<AssignmentsPage />} />
               <Route path="/absences" element={<AbsencesPage />} />
@@ -80,6 +83,7 @@ export default function App() {
               }>
                 <Route index element={<ManagerKindergartensPage />} />
               </Route>
+              <Route path="/kindergartens/:id" element={<KindergartenDetailPage />} />
               <Route path="/activity" element={<ActivityDashboard />} />
               <Route path="/ml-insights" element={
                 <ProtectedRoute allowedRoles={['manager', 'authority_admin', 'super_admin']} />

@@ -5,7 +5,7 @@
     "description": "Backend: LIMIT/OFFSET on GET /api/substitutes. Frontend: page controls with Hebrew labels.",
     "priority": "high",
     "status": "done",
-    "assignedTo": "team-lead",
+    "assignedTo": "backend-developer",
     "createdAt": "2026-05-07T06:00:00.000Z",
     "updatedAt": "2026-05-07T18:24:06.386Z",
     "completedAt": "2026-05-07T18:24:06.386Z"
@@ -46,36 +46,44 @@
     "title": "Export substitutes list to CSV",
     "description": "Button on substitutes page: download CSV with name, phone, status, assignments count. Client-side generation.",
     "priority": "low",
-    "status": "pending",
-    "assignedTo": null,
-    "createdAt": "2026-05-07T06:04:00.000Z"
+    "status": "done",
+    "assignedTo": "react-specialist",
+    "createdAt": "2026-05-07T06:04:00.000Z",
+    "updatedAt": "2026-05-07T18:39:06.777Z",
+    "completedAt": "2026-05-07T18:39:06.777Z"
   },
   {
     "id": "t006",
     "title": "Mark substitute as unavailable for date range",
-    "description": "New table: substitute_unavailability (substitute_id, from_date, to_date, reason). API + frontend calendar UI.",
+    "description": "API: GET/POST/DELETE /:id/unavailability using substitute_availability table. Frontend: UnavailabilityModal with date pickers, max 90 days.",
     "priority": "high",
-    "status": "pending",
-    "assignedTo": null,
-    "createdAt": "2026-05-07T06:05:00.000Z"
+    "status": "done",
+    "assignedTo": "backend-developer",
+    "createdAt": "2026-05-07T06:05:00.000Z",
+    "updatedAt": "2026-05-07T19:10:00.000Z",
+    "completedAt": "2026-05-07T19:10:00.000Z"
   },
   {
     "id": "t007",
     "title": "Assignment history page per substitute",
-    "description": "GET /api/substitutes/:id/assignments — list all past/current assignments. New page with RTL table.",
+    "description": "GET /api/substitutes/:id/assignments — paginated, status-filtered. New page /substitutes/:id/history with RTL table.",
     "priority": "medium",
-    "status": "pending",
-    "assignedTo": null,
-    "createdAt": "2026-05-07T06:06:00.000Z"
+    "status": "done",
+    "assignedTo": "react-specialist",
+    "createdAt": "2026-05-07T06:06:00.000Z",
+    "updatedAt": "2026-05-07T19:10:00.000Z",
+    "completedAt": "2026-05-07T19:10:00.000Z"
   },
   {
     "id": "t008",
     "title": "Kindergarten detail page",
-    "description": "Page showing kindergarten info, its manager, absence history, and assigned substitutes.",
+    "description": "GET /api/kindergartens/:id — returns kindergarten info + manager + last 10 absences + assignment stats. New page /kindergartens/:id.",
     "priority": "medium",
-    "status": "pending",
-    "assignedTo": null,
-    "createdAt": "2026-05-07T06:07:00.000Z"
+    "status": "done",
+    "assignedTo": "react-specialist",
+    "createdAt": "2026-05-07T06:07:00.000Z",
+    "updatedAt": "2026-05-07T19:10:00.000Z",
+    "completedAt": "2026-05-07T19:10:00.000Z"
   },
   {
     "id": "t009",
@@ -98,5 +106,27 @@
     "createdAt": "2026-05-07T06:09:00.000Z",
     "updatedAt": "2026-05-07T18:25:41.721Z",
     "completedAt": "2026-05-07T18:25:41.721Z"
+  },
+  {
+    "id": "t011",
+    "title": "Fix demo login — actions silently fail",
+    "description": "Duplicate authority rows in DB (missing UNIQUE constraint) caused JWT authority_id mismatch. Added constraint + idempotent seed + fixed super_admin fallback.",
+    "priority": "critical",
+    "status": "done",
+    "assignedTo": "debugger",
+    "createdAt": "2026-05-07T18:30:00.000Z",
+    "updatedAt": "2026-05-07T18:34:36.161Z",
+    "completedAt": "2026-05-07T18:34:36.161Z"
+  },
+  {
+    "id": "t012",
+    "title": "Live agent dashboard",
+    "description": "React page at /agent-dashboard (no auth) polling /api/agent/* endpoints. Shows all 12 agents, task queue, activity log in dark theme.",
+    "priority": "high",
+    "status": "done",
+    "assignedTo": "react-specialist",
+    "createdAt": "2026-05-07T17:00:00.000Z",
+    "updatedAt": "2026-05-07T18:24:06.376Z",
+    "completedAt": "2026-05-07T18:24:06.376Z"
   }
 ]

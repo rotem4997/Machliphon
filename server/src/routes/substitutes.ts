@@ -346,6 +346,270 @@ router.patch('/:id/reject', requireRole('manager', 'authority_admin', 'super_adm
   return res.json({ message: 'מחליפה נדחתה.' });
 }));
 
+// ── Shared Zod schemas for unavailability endpoints ──────────────────────────
+
+const dateRangeSchema = z.object({
+  fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'fromDate חייב להיות בפורמט YYYY-MM-DD'),
+  toDate:   z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'toDate חייב להיות בפורמט YYYY-MM-DD'),
+});
+
+const unavailabilityBodySchema = dateRangeSchema.extend({
+  reason: z.enum(['vacation', 'sick', 'personal', 'training', 'other']).optional(),
+});
+
+/** Returns every date from fromDate to toDate (inclusive) as 'YYYY-MM-DD' strings. */
+function expandDateRange(fromDate: string, toDate: string): string[] {
+  const dates: string[] = [];
+  const current = new Date(fromDate);
+  const end     = new Date(toDate);
+  while (current <= end) {
+    dates.push(current.toISOString().slice(0, 10));
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+  return dates;
+}
+
+/**
+ * Resolves the substitute record, enforcing that it belongs to req.user's authority.
+ * Throws NotFoundError (404) when the substitute does not exist or is from a different authority.
+ */
+async function resolveSubstituteForAuthority(
+  substituteId: string,
+  authorityId: string,
+  source: string,
+): Promise<string> {
+  const result = await query(
+    'SELECT id FROM substitutes WHERE id = $1 AND authority_id = $2',
+    [substituteId, authorityId],
+  );
+  if (result.rows.length === 0) {
+    throw new NotFoundError('מחליפה לא נמצאה.', {
+      source,
+      detail: `Substitute ${substituteId} not found in authority ${authorityId}`,
+      meta: { substituteId, authorityId },
+    });
+  }
+  return result.rows[0].id as string;
+}
+
+// ── t006: Manager-managed unavailability for a substitute ─────────────────────
+
+// GET /api/substitutes/:id/unavailability
+router.get(
+  '/:id/unavailability',
+  requireRole('manager', 'authority_admin', 'super_admin'),
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const source = 'GET /api/substitutes/:id/unavailability';
+    await resolveSubstituteForAuthority(req.params.id, req.user!.authority_id!, source);
+
+    const { month, year } = req.query;
+
+    const whereClauses: string[] = [
+      'substitute_id = $1',
+      'is_available = false',
+    ];
+    const params: unknown[] = [req.params.id];
+    let paramIdx = 2;
+
+    if (month !== undefined) {
+      const m = parseInt(month as string, 10);
+      if (isNaN(m) || m < 1 || m > 12) {
+        throw new ValidationError('חודש חייב להיות מספר בין 1 ל-12.', {
+          source,
+          detail: `Invalid month query param: "${month}"`,
+        });
+      }
+      whereClauses.push(`EXTRACT(MONTH FROM date) = $${paramIdx++}`);
+      params.push(m);
+    }
+
+    if (year !== undefined) {
+      const y = parseInt(year as string, 10);
+      if (isNaN(y) || y < 2000 || y > 2100) {
+        throw new ValidationError('שנה לא תקינה.', {
+          source,
+          detail: `Invalid year query param: "${year}"`,
+        });
+      }
+      whereClauses.push(`EXTRACT(YEAR FROM date) = $${paramIdx++}`);
+      params.push(y);
+    }
+
+    const result = await query(
+      `SELECT id, date, reason
+       FROM substitute_availability
+       WHERE ${whereClauses.join(' AND ')}
+       ORDER BY date`,
+      params,
+    );
+
+    return res.json(result.rows);
+  }),
+);
+
+// POST /api/substitutes/:id/unavailability
+router.post(
+  '/:id/unavailability',
+  requireRole('manager', 'authority_admin', 'super_admin'),
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const source = 'POST /api/substitutes/:id/unavailability';
+
+    const parsed = unavailabilityBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new ValidationError(
+        parsed.error.errors[0]?.message || 'נתונים לא תקינים.',
+        { source, detail: JSON.stringify(parsed.error.errors) },
+      );
+    }
+
+    const { fromDate, toDate, reason } = parsed.data;
+
+    if (fromDate > toDate) {
+      throw new ValidationError('תאריך התחלה חייב להיות לפני תאריך הסיום.', {
+        source,
+        detail: `fromDate (${fromDate}) is after toDate (${toDate})`,
+      });
+    }
+
+    await resolveSubstituteForAuthority(req.params.id, req.user!.authority_id!, source);
+
+    const dates = expandDateRange(fromDate, toDate);
+
+    if (dates.length > 90) {
+      throw new ValidationError('טווח התאריכים לא יכול לעלות על 90 יום.', {
+        source,
+        detail: `Date range ${fromDate} – ${toDate} spans ${dates.length} days (max 90)`,
+      });
+    }
+
+    // Upsert each date in a single transaction
+    await query('BEGIN');
+    try {
+      for (const date of dates) {
+        await query(
+          `INSERT INTO substitute_availability (substitute_id, date, is_available, reason)
+           VALUES ($1, $2, false, $3)
+           ON CONFLICT (substitute_id, date)
+           DO UPDATE SET is_available = false, reason = EXCLUDED.reason`,
+          [req.params.id, date, reason ?? null],
+        );
+      }
+      await query('COMMIT');
+    } catch (err) {
+      await query('ROLLBACK');
+      throw err;
+    }
+
+    return res.json({
+      message: 'זמינות עודכנה בהצלחה',
+      datesUpdated: dates.length,
+    });
+  }),
+);
+
+// DELETE /api/substitutes/:id/unavailability
+router.delete(
+  '/:id/unavailability',
+  requireRole('manager', 'authority_admin', 'super_admin'),
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const source = 'DELETE /api/substitutes/:id/unavailability';
+
+    const parsed = dateRangeSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new ValidationError(
+        parsed.error.errors[0]?.message || 'נתונים לא תקינים.',
+        { source, detail: JSON.stringify(parsed.error.errors) },
+      );
+    }
+
+    const { fromDate, toDate } = parsed.data;
+
+    if (fromDate > toDate) {
+      throw new ValidationError('תאריך התחלה חייב להיות לפני תאריך הסיום.', {
+        source,
+        detail: `fromDate (${fromDate}) is after toDate (${toDate})`,
+      });
+    }
+
+    await resolveSubstituteForAuthority(req.params.id, req.user!.authority_id!, source);
+
+    const result = await query(
+      `DELETE FROM substitute_availability
+       WHERE substitute_id = $1
+         AND date BETWEEN $2::date AND $3::date
+       RETURNING id`,
+      [req.params.id, fromDate, toDate],
+    );
+
+    return res.json({
+      message: 'זמינות שוחזרה בהצלחה',
+      datesCleared: result.rowCount ?? result.rows.length,
+    });
+  }),
+);
+
+// ── t007: Paginated assignment history for a substitute ───────────────────────
+
+// GET /api/substitutes/:id/assignments
+router.get(
+  '/:id/assignments',
+  requireRole('manager', 'authority_admin', 'super_admin'),
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const source = 'GET /api/substitutes/:id/assignments';
+    await resolveSubstituteForAuthority(req.params.id, req.user!.authority_id!, source);
+
+    const page  = Math.max(1, parseInt(req.query.page  as string) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const offset = (page - 1) * limit;
+    const { status } = req.query;
+
+    const whereClauses: string[] = ['a.substitute_id = $1'];
+    const params: unknown[] = [req.params.id];
+    let paramIdx = 2;
+
+    if (status) {
+      whereClauses.push(`a.status = $${paramIdx++}`);
+      params.push(status);
+    }
+
+    const where = whereClauses.join(' AND ');
+
+    const countResult = await query(
+      `SELECT COUNT(*) FROM assignments a WHERE ${where}`,
+      params,
+    );
+    const total = parseInt(countResult.rows[0].count, 10);
+
+    const dataResult = await query(
+      `SELECT
+         a.id,
+         a.assignment_date,
+         a.status,
+         a.start_time,
+         a.end_time,
+         a.hours_worked,
+         a.total_pay,
+         a.notes,
+         k.name    AS kindergarten_name,
+         k.address AS kindergarten_address
+       FROM assignments a
+       JOIN kindergartens k ON a.kindergarten_id = k.id
+       WHERE ${where}
+       ORDER BY a.assignment_date DESC
+       LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
+      [...params, limit, offset],
+    );
+
+    return res.json({
+      data: dataResult.rows,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    });
+  }),
+);
+
 // GET /api/substitutes/:id - get single substitute
 router.get('/:id', requireRole('manager', 'authority_admin', 'super_admin'), asyncHandler(async (req: AuthRequest, res: Response) => {
   const result = await query(`
