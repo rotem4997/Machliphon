@@ -2,7 +2,8 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Calendar, AlertTriangle, ChevronRight, ChevronLeft, Plus, X,
-  Clock, User, LayoutGrid, List, CheckCircle, Phone, Sparkles,
+  Clock, User, LayoutGrid, List, CheckCircle, Sparkles,
+  Users, Bell, TrendingUp, ShieldAlert,
 } from 'lucide-react';
 import api, { handleApiError } from '@/utils/api';
 import toast from 'react-hot-toast';
@@ -12,8 +13,11 @@ import {
 } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { isHoliday } from '@/utils/holidays';
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+} from 'recharts';
 
-// ─── Types ──────────────────────────────────────────────────
+// ─── Types ───────────────────────────────────────────────────
 
 interface Kindergarten {
   id: string;
@@ -60,9 +64,25 @@ interface Recommendation {
   features: Record<string, number>;
 }
 
+interface DashboardStats {
+  totalSubstitutes: number;
+  todayCovered: number;
+  todayTotal: number;
+  openAbsences: number;
+  expiringPermits: number;
+  weekCoverage: { date: string; assignments: number; open_absences: number }[];
+}
+
+interface Alert {
+  type: string;
+  severity: 'high' | 'medium' | 'low';
+  message: string;
+  data: Record<string, unknown>;
+}
+
 type ViewMode = 'week' | 'month' | 'list';
 
-// ─── Mock data (used when API returns nothing) ───────────────
+// ─── Mock data ────────────────────────────────────────────────
 
 const MOCK_KINDERGARTENS: Kindergarten[] = [
   { id: 'kg-1',  name: 'גן חבצלת',  address: 'רחוב הרצל 15',        neighborhood: 'מרכז',  age_group: 'גן ילדים'  },
@@ -103,12 +123,10 @@ function buildMockAbsences(): AbsenceReport[] {
     if (date.getDay() === 6) continue;
     const dateStr = format(date, 'yyyy-MM-dd');
     const seed = Math.abs(offset * 7 + 3);
-    // 1-3 absences per day
     const count = 1 + (seed % 3);
     for (let i = 0; i < count; i++) {
       const kg = MOCK_KINDERGARTENS[(seed + i * 3) % MOCK_KINDERGARTENS.length];
       const isOpen = (offset >= 0) && (i === 0) && (seed % 3 !== 0);
-      const sub = MOCK_SUBS[(seed + i) % MOCK_SUBS.length];
       result.push({
         id: `mock-abs-${dateStr}-${i}`,
         kindergarten_id: kg.id,
@@ -120,12 +138,6 @@ function buildMockAbsences(): AbsenceReport[] {
         absence_reason: ['מחלה', 'חופשה', 'אישי'][i % 3],
         status: isOpen ? 'open' : 'assigned',
       });
-      if (!isOpen) {
-        result.push({
-          ...result[result.length - 1],
-          id: `mock-asgn-ref-${dateStr}-${i}`,
-        });
-      }
     }
   }
   return result;
@@ -165,10 +177,41 @@ function buildMockAssignmentsFull(): Assignment[] {
   return result;
 }
 
+function buildMockWeekCoverage() {
+  const today = new Date();
+  const weekStart = startOfWeek(today, { weekStartsOn: 0 });
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = addDays(weekStart, i);
+    const isSat = d.getDay() === 6;
+    return {
+      date: format(d, 'yyyy-MM-dd'),
+      label: format(d, 'EEE', { locale: he }),
+      assignments: isSat ? 0 : 8 + (i * 2) % 5,
+      open_absences: isSat ? 0 : (i % 3 === 1 ? 2 : i % 4 === 3 ? 3 : 0),
+    };
+  }).filter(d => new Date(d.date).getDay() !== 6);
+}
+
 const MOCK_ABSENCES = buildMockAbsences();
 const MOCK_ASSIGNMENTS_FULL = buildMockAssignmentsFull();
+const MOCK_WEEK_COVERAGE = buildMockWeekCoverage();
 
-// ─── Status config ──────────────────────────────────────────
+const MOCK_STATS: DashboardStats = {
+  totalSubstitutes: 24,
+  todayCovered: 8,
+  todayTotal: 10,
+  openAbsences: 2,
+  expiringPermits: 3,
+  weekCoverage: MOCK_WEEK_COVERAGE,
+};
+
+const MOCK_ALERTS: Alert[] = [
+  { type: 'uncovered_absence', severity: 'high', message: 'גן חבצלת: דנה שמעוני נעדרת ואין מחליפה', data: {} },
+  { type: 'permit_expiring', severity: 'medium', message: 'תיק עובד של מרים אברהם פג תוקפו בעוד 5 ימים', data: {} },
+  { type: 'unplanned_known_absence', severity: 'low', message: 'חופש מתוכנן בגן נרקיס ב-15/05 — אין שיבוץ עדיין', data: {} },
+];
+
+// ─── Status config ────────────────────────────────────────────
 
 const statusConfig: Record<string, { label: string; cls: string }> = {
   pending: { label: 'ממתין', cls: 'badge-amber' },
@@ -178,19 +221,36 @@ const statusConfig: Record<string, { label: string; cls: string }> = {
   cancelled: { label: 'בוטל', cls: 'badge-red' },
 };
 
-// ─── Main Component ─────────────────────────────────────────
+const alertColors: Record<string, string> = {
+  high: 'bg-red-50 border-red-200 text-red-700',
+  medium: 'bg-amber-50 border-amber-200 text-amber-700',
+  low: 'bg-blue-50 border-blue-200 text-blue-700',
+};
+
+// ─── Main Component ───────────────────────────────────────────
 
 export default function DashboardPage() {
   const queryClient = useQueryClient();
   const today = new Date();
 
-  // ─── State ─────────────────────────────────────────────
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [currentDate, setCurrentDate] = useState(today);
   const [selectedDay, setSelectedDay] = useState<Date>(today);
   const [assignModal, setAssignModal] = useState<{ kindergartenId: string; date: string } | null>(null);
 
-  // ─── Queries ───────────────────────────────────────────
+  // ─── Queries ──────────────────────────────────────────────
+  const { data: stats } = useQuery<DashboardStats>({
+    queryKey: ['dashboard-stats'],
+    queryFn: () => api.get('/dashboard/stats').then(r => r.data).catch(() => null),
+    refetchInterval: 60_000,
+  });
+
+  const { data: alerts } = useQuery<Alert[]>({
+    queryKey: ['dashboard-alerts'],
+    queryFn: () => api.get('/dashboard/alerts').then(r => r.data).catch(() => null),
+    refetchInterval: 120_000,
+  });
+
   const { data: kindergartens } = useQuery<Kindergarten[]>({
     queryKey: ['kindergartens'],
     queryFn: () => api.get('/kindergartens').then(r => r.data),
@@ -198,15 +258,15 @@ export default function DashboardPage() {
 
   const visibleMonth = currentDate.getMonth() + 1;
   const visibleYear = currentDate.getFullYear();
+
   const { data: assignments } = useQuery<Assignment[]>({
     queryKey: ['assignments', visibleYear, visibleMonth],
     queryFn: () => api.get('/assignments', { params: { month: visibleMonth, year: visibleYear } }).then(r => r.data),
   });
 
-  // Also fetch the previous and next month so the visible week never shows
-  // an empty calendar near month boundaries.
   const prev = subMonths(currentDate, 1);
   const next = addMonths(currentDate, 1);
+
   const { data: prevMonthAssignments } = useQuery<Assignment[]>({
     queryKey: ['assignments', prev.getFullYear(), prev.getMonth() + 1],
     queryFn: () => api.get('/assignments', { params: { month: prev.getMonth() + 1, year: prev.getFullYear() } }).then(r => r.data),
@@ -241,45 +301,51 @@ export default function DashboardPage() {
     return fromApi.length > 0 ? fromApi : MOCK_ABSENCES;
   }, [prevMonthAbsences, absences, nextMonthAbsences]);
 
+  const liveStats = stats ?? MOCK_STATS;
+  const liveAlerts = alerts ?? MOCK_ALERTS;
+
+  const weekCoverageData = useMemo(() => {
+    const raw = liveStats.weekCoverage ?? MOCK_WEEK_COVERAGE;
+    return raw.map(r => ({
+      ...r,
+      label: format(parseISO(r.date), 'EEE', { locale: he }),
+    }));
+  }, [liveStats]);
+
   const selectedDayStr = format(selectedDay, 'yyyy-MM-dd');
   const holiday = isHoliday(selectedDayStr);
   const isSaturday = selectedDay.getDay() === 6;
 
-  // Assignments for selected day
   const dayAssignments = useMemo(
     () => allAssignments.filter(a => a.assignment_date === selectedDayStr && a.status !== 'cancelled'),
-    [allAssignments, selectedDayStr]
+    [allAssignments, selectedDayStr],
   );
 
-  // Holes = open absences for the selected day that haven't been covered yet.
   const dayAbsences = useMemo(
     () => allAbsences.filter(a => a.absence_date === selectedDayStr),
-    [allAbsences, selectedDayStr]
+    [allAbsences, selectedDayStr],
   );
   const holes = useMemo(() => dayAbsences.filter(a => a.status === 'open'), [dayAbsences]);
 
-  // Stats — coverage rate of today's absences.
   const totalKgs = kgs.length;
   const totalAbsences = dayAbsences.length;
   const coveredCount = totalAbsences - holes.length;
   const coveragePct = totalAbsences > 0
     ? Math.round((coveredCount / totalAbsences) * 100)
-    : 100; // No absences today = 100% coverage
+    : 100;
 
-  // ─── Navigation ────────────────────────────────────────
+  // ─── Navigation ───────────────────────────────────────────
   const navigateBack = () => {
-    setCurrentDate(prev => viewMode === 'week' ? subWeeks(prev, 1) : subMonths(prev, 1));
+    setCurrentDate(p => viewMode === 'week' ? subWeeks(p, 1) : subMonths(p, 1));
   };
   const navigateForward = () => {
-    setCurrentDate(prev => viewMode === 'week' ? addWeeks(prev, 1) : addMonths(prev, 1));
+    setCurrentDate(p => viewMode === 'week' ? addWeeks(p, 1) : addMonths(p, 1));
   };
 
-  // ─── Week days ─────────────────────────────────────────
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
-    .filter(d => d.getDay() !== 6); // Exclude Saturday
+    .filter(d => d.getDay() !== 6);
 
-  // ─── Month days ────────────────────────────────────────
   const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
   const allMonthDates = Array.from({ length: daysInMonth }, (_, i) =>
     new Date(currentDate.getFullYear(), currentDate.getMonth(), i + 1)
@@ -290,8 +356,7 @@ export default function DashboardPage() {
     ...allMonthDates,
   ];
 
-  // ─── Date cell info ────────────────────────────────────
-  const getDateInfo = (dateStr: string, _day: Date) => {
+  const getDateInfo = (dateStr: string) => {
     const hol = isHoliday(dateStr);
     if (hol) return { status: 'holiday' as const, label: hol.name };
     const dayHoles = allAbsences.filter(a => a.absence_date === dateStr && a.status === 'open').length;
@@ -299,7 +364,7 @@ export default function DashboardPage() {
     return { status: 'holes' as const, label: `${dayHoles}` };
   };
 
-  // ─── Real assign mutation ──────────────────────────────
+  // ─── Assign mutation ──────────────────────────────────────
   const assignMutation = useMutation({
     mutationFn: (vars: { kindergartenId: string; substituteId: string; date: string }) =>
       api.post('/assignments', {
@@ -309,6 +374,8 @@ export default function DashboardPage() {
       }).then(r => r.data),
     onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: ['assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-alerts'] });
       const kg = kgs.find(k => k.id === vars.kindergartenId);
       toast.success(`השיבוץ נוצר ל${kg?.name ?? 'גן'}`);
       setAssignModal(null);
@@ -320,7 +387,7 @@ export default function DashboardPage() {
     assignMutation.mutate({ kindergartenId, substituteId, date });
   };
 
-  // ─── Render ────────────────────────────────────────────
+  // ─── Render ───────────────────────────────────────────────
   return (
     <div className="space-y-5 fade-in max-w-6xl mx-auto">
       {/* Header */}
@@ -331,21 +398,102 @@ export default function DashboardPage() {
             {format(today, 'EEEE, d בMMMM yyyy', { locale: he })}
           </p>
         </div>
-        {/* KPI badges */}
         <div className="flex items-center gap-3">
           <div className={`px-4 py-2 rounded-xl text-sm font-bold ${
             coveragePct >= 80 ? 'bg-mint-100 text-mint-700' :
             coveragePct >= 50 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'
           }`}>
-            {coveragePct}% כיסוי
+            {coveragePct}% כיסוי היום
           </div>
-          {holes.length > 0 && !holiday && !isSaturday && (
-            <div className="px-4 py-2 rounded-xl text-sm font-bold bg-red-50 text-red-700">
-              {holes.length} חורים
+          {liveAlerts.filter(a => a.severity === 'high').length > 0 && (
+            <div className="px-4 py-2 rounded-xl text-sm font-bold bg-red-50 text-red-700 flex items-center gap-1.5">
+              <Bell size={14} />
+              {liveAlerts.filter(a => a.severity === 'high').length} התראות
             </div>
           )}
         </div>
       </div>
+
+      {/* ─── KPI Bar ─── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="card p-4">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs text-slate-500">מחליפות פעילות</p>
+            <Users size={16} className="text-sky-400" />
+          </div>
+          <p className="text-2xl font-black text-navy-900">{liveStats.totalSubstitutes}</p>
+        </div>
+        <div className="card p-4">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs text-slate-500">כיסוי היום</p>
+            <CheckCircle size={16} className="text-mint-400" />
+          </div>
+          <p className={`text-2xl font-black ${liveStats.todayTotal > 0 && liveStats.todayCovered < liveStats.todayTotal ? 'text-amber-500' : 'text-mint-500'}`}>
+            {liveStats.todayCovered}/{liveStats.todayTotal}
+          </p>
+        </div>
+        <div className="card p-4">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs text-slate-500">חורים פתוחים</p>
+            <AlertTriangle size={16} className="text-red-400" />
+          </div>
+          <p className={`text-2xl font-black ${liveStats.openAbsences > 0 ? 'text-red-500' : 'text-mint-500'}`}>
+            {liveStats.openAbsences}
+          </p>
+        </div>
+        <div className="card p-4">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs text-slate-500">תיקי עובד פגים</p>
+            <ShieldAlert size={16} className="text-amber-400" />
+          </div>
+          <p className={`text-2xl font-black ${liveStats.expiringPermits > 0 ? 'text-amber-500' : 'text-navy-900'}`}>
+            {liveStats.expiringPermits}
+          </p>
+        </div>
+      </div>
+
+      {/* ─── Week Coverage Chart ─── */}
+      {weekCoverageData.length > 0 && (
+        <div className="card p-5">
+          <h3 className="font-bold text-navy-900 mb-4 flex items-center gap-2">
+            <TrendingUp size={16} className="text-mint-500" />
+            כיסוי השבוע
+          </h3>
+          <ResponsiveContainer width="100%" height={140}>
+            <AreaChart data={weekCoverageData} margin={{ top: 4, right: 4, left: -28, bottom: 0 }}>
+              <defs>
+                <linearGradient id="assignGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#17C98A" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="#17C98A" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="holeGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#EF4444" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} />
+              <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} allowDecimals={false} />
+              <Tooltip
+                formatter={(v, name) => [v, name === 'assignments' ? 'שיבוצים' : 'חורים']}
+                labelFormatter={l => `יום ${l}`}
+              />
+              <Area type="monotone" dataKey="assignments" stroke="#17C98A" strokeWidth={2} fill="url(#assignGrad)" name="assignments" />
+              <Area type="monotone" dataKey="open_absences" stroke="#EF4444" strokeWidth={2} fill="url(#holeGrad)" name="open_absences" />
+            </AreaChart>
+          </ResponsiveContainer>
+          <div className="flex items-center gap-5 mt-2">
+            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+              <div className="w-3 h-0.5 bg-mint-500 rounded" />
+              שיבוצים
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+              <div className="w-3 h-0.5 bg-red-400 rounded" />
+              חורים פתוחים
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col lg:flex-row gap-5">
         {/* ═══ LEFT: Calendar ═══ */}
@@ -400,7 +548,7 @@ export default function DashboardPage() {
                 ))}
                 {weekDays.map(day => {
                   const dateStr = format(day, 'yyyy-MM-dd');
-                  const info = getDateInfo(dateStr, day);
+                  const info = getDateInfo(dateStr);
                   const isSelected = isSameDay(day, selectedDay);
                   const isTodayDate = isToday(day);
 
@@ -445,7 +593,7 @@ export default function DashboardPage() {
                 {monthDays.map((day, i) => {
                   if (!day) return <div key={`empty-${i}`} />;
                   const dateStr = format(day, 'yyyy-MM-dd');
-                  const info = getDateInfo(dateStr, day);
+                  const info = getDateInfo(dateStr);
                   const isSelected = isSameDay(day, selectedDay);
                   const isTodayDate = isToday(day);
 
@@ -477,18 +625,17 @@ export default function DashboardPage() {
             {viewMode === 'list' && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between mb-3">
-                  <button onClick={() => setCurrentDate(prev => subMonths(prev, 1))} className="p-1.5 hover:bg-slate-100 rounded-lg">
+                  <button onClick={() => setCurrentDate(p => subMonths(p, 1))} className="p-1.5 hover:bg-slate-100 rounded-lg">
                     <ChevronRight size={18} />
                   </button>
                   <span className="font-semibold text-sm text-navy-900">
                     {format(currentDate, 'MMMM yyyy', { locale: he })}
                   </span>
-                  <button onClick={() => setCurrentDate(prev => addMonths(prev, 1))} className="p-1.5 hover:bg-slate-100 rounded-lg">
+                  <button onClick={() => setCurrentDate(p => addMonths(p, 1))} className="p-1.5 hover:bg-slate-100 rounded-lg">
                     <ChevronLeft size={18} />
                   </button>
                 </div>
 
-                {/* Show days with holes in the month */}
                 {allMonthDates
                   .filter(day => isSameMonth(day, currentDate))
                   .map(day => {
@@ -535,9 +682,7 @@ export default function DashboardPage() {
                           )}
                         </div>
 
-                        {!hol && dayHoles === 0 && (
-                          <CheckCircle size={18} className="text-mint-500" />
-                        )}
+                        {!hol && dayHoles === 0 && <CheckCircle size={18} className="text-mint-500" />}
                         {!hol && dayHoles > 0 && (
                           <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-red-100 text-red-600">
                             {dayHoles}
@@ -567,9 +712,9 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ═══ RIGHT: Day detail ═══ */}
+        {/* ═══ RIGHT: Day detail + Alerts ═══ */}
         <div className="lg:w-96 space-y-5">
-          {/* Selected day header */}
+          {/* Selected day card */}
           <div className="card p-5">
             <h3 className="font-bold text-navy-900 mb-1">
               {isSameDay(selectedDay, today) ? 'היום' : format(selectedDay, 'EEEE d/M', { locale: he })}
@@ -596,7 +741,6 @@ export default function DashboardPage() {
                       </>}
                 </p>
 
-                {/* Holes - action items (open absences without coverage) */}
                 {holes.length > 0 && (
                   <div className="mt-4">
                     <h4 className="text-sm font-bold text-red-600 mb-2 flex items-center gap-1.5">
@@ -629,7 +773,6 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                {/* Covered assignments */}
                 {dayAssignments.length > 0 && (
                   <div className="mt-4">
                     <h4 className="text-sm font-bold text-navy-900 mb-2">שיבוצים פעילים</h4>
@@ -681,10 +824,30 @@ export default function DashboardPage() {
               <p className="text-xs text-slate-500 mt-0.5">כיסוי היום</p>
             </div>
           </div>
+
+          {/* Alerts panel */}
+          {liveAlerts.length > 0 && (
+            <div className="card p-4">
+              <h4 className="font-bold text-navy-900 mb-3 flex items-center gap-2">
+                <Bell size={15} className="text-amber-500" />
+                התראות ({liveAlerts.length})
+              </h4>
+              <div className="space-y-2">
+                {liveAlerts.map((alert, i) => (
+                  <div
+                    key={i}
+                    className={`text-xs rounded-xl px-3 py-2.5 border font-medium ${alertColors[alert.severity]}`}
+                  >
+                    {alert.message}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* ─── Assign Modal ─── */}
+      {/* Assign Modal */}
       {assignModal && (
         <AssignModal
           kindergartenId={assignModal.kindergartenId}
@@ -699,7 +862,7 @@ export default function DashboardPage() {
   );
 }
 
-// ─── Assign Modal Component ─────────────────────────────────
+// ─── Assign Modal ─────────────────────────────────────────────
 
 function AssignModal({
   kindergartenId,
@@ -719,9 +882,6 @@ function AssignModal({
   const [selectedSub, setSelectedSub] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
 
-  // ML-powered recommendations: filtered for permit/active/conflict and
-  // ranked by match probability. Cold-starts gracefully when no model
-  // is trained yet.
   const { data, isLoading } = useQuery<{
     count: number;
     recommendations: Recommendation[];
@@ -746,10 +906,6 @@ function AssignModal({
     ? data.recommendations
     : mockRecs;
   const selectedRec = recs.find(r => r.substituteId === selectedSub);
-
-  const handleConfirmAssign = () => {
-    if (selectedSub) onAssign(selectedSub);
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -777,7 +933,7 @@ function AssignModal({
             </label>
             {isLoading ? (
               <div className="text-center py-6 text-sm text-slate-500">טוען...</div>
-            ) : recs.length > 0 ? (
+            ) : (
               <div className="space-y-1.5 max-h-72 overflow-y-auto">
                 {recs.map((r, idx) => {
                   const initials = r.fullName.split(' ').map(s => s[0]).slice(0, 2).join('');
@@ -823,14 +979,6 @@ function AssignModal({
                   );
                 })}
               </div>
-            ) : (
-              <div className="text-center py-6 border border-slate-200 rounded-xl">
-                <AlertTriangle size={24} className="text-amber-400 mx-auto mb-2" />
-                <p className="text-sm text-slate-500 font-medium">אין מחליפות זמינות ליום זה</p>
-                <p className="text-xs text-slate-400 mt-1">
-                  כל המחליפות הפעילות כבר משובצות, או שאין מחליפות עם תיק עובד תקף.
-                </p>
-              </div>
             )}
           </div>
 
@@ -846,7 +994,6 @@ function AssignModal({
           </div>
         </div>
       ) : (
-        /* Confirmation dialog */
         <div className="card p-6 w-full max-w-sm slide-in text-center">
           <div className="w-14 h-14 rounded-full bg-mint-100 flex items-center justify-center mx-auto mb-4">
             <CheckCircle size={28} className="text-mint-500" />
@@ -862,7 +1009,7 @@ function AssignModal({
             {format(parseISO(date), 'EEEE, d בMMMM yyyy', { locale: he })}
           </p>
           <div className="flex gap-2">
-            <button onClick={handleConfirmAssign} disabled={submitting} className="btn-primary flex-1 disabled:opacity-50">
+            <button onClick={() => onAssign(selectedSub)} disabled={submitting} className="btn-primary flex-1 disabled:opacity-50">
               {submitting ? 'שולח...' : 'אישור'}
             </button>
             <button onClick={() => setShowConfirm(false)} className="btn-secondary flex-1">

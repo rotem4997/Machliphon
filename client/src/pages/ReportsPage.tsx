@@ -1,15 +1,15 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  BarChart3, FileText, Download, TrendingUp
+  BarChart3, FileText, Download, TrendingUp, Award,
 } from 'lucide-react';
 import api from '@/utils/api';
 import toast from 'react-hot-toast';
-import { format } from 'date-fns';
+import { format, getDaysInMonth } from 'date-fns';
 import { he } from 'date-fns/locale';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell
+  PieChart, Pie, Cell, LineChart, Line, Legend,
 } from 'recharts';
 
 interface Assignment {
@@ -33,7 +33,7 @@ interface NeighborhoodCoverage {
 
 const COLORS = ['#17C98A', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
 
-// ─── Mock fallback data ──────────────────────────────────────
+// ─── Mock data ────────────────────────────────────────────────
 
 const KG_NAMES = [
   'גן חבצלת', 'גן נרקיס', 'גן רקפת', 'גן כלנית', 'גן דליה',
@@ -41,11 +41,16 @@ const KG_NAMES = [
   'גן אביבית', 'גן צבעוני',
 ];
 
+const SUB_NAMES = [
+  ['מרים', 'אברהם'], ['רחל', 'לוי'], ['שרה', 'כהן'],
+  ['לאה', 'דוד'], ['נועה', 'פרידמן'],
+];
+
 const STATUSES = ['completed', 'completed', 'completed', 'arrived', 'confirmed', 'cancelled'];
 
 function buildMockReportAssignments(month: number, year: number): Assignment[] {
   const result: Assignment[] = [];
-  const daysInMonth = new Date(year, month, 0).getDate();
+  const daysInMonth = getDaysInMonth(new Date(year, month - 1, 1));
   let idx = 0;
   for (let d = 1; d <= daysInMonth; d++) {
     const date = new Date(year, month - 1, d);
@@ -55,6 +60,7 @@ function buildMockReportAssignments(month: number, year: number): Assignment[] {
     for (let a = 0; a < count; a++) {
       const status = STATUSES[(idx + a) % STATUSES.length];
       const hours = status === 'completed' || status === 'arrived' ? 6.5 : null;
+      const sub = SUB_NAMES[(idx + a) % SUB_NAMES.length];
       result.push({
         id: `mock-rpt-${d}-${a}`,
         assignment_date: dateStr,
@@ -62,8 +68,8 @@ function buildMockReportAssignments(month: number, year: number): Assignment[] {
         hours_worked: hours,
         total_pay: hours ? hours * 55 : null,
         kindergarten_name: KG_NAMES[a % KG_NAMES.length],
-        substitute_first_name: ['מרים', 'רחל', 'שרה', 'לאה', 'נועה'][a % 5],
-        substitute_last_name: ['אברהם', 'לוי', 'כהן', 'דוד', 'פרידמן'][a % 5],
+        substitute_first_name: sub[0],
+        substitute_last_name: sub[1],
       });
     }
     idx++;
@@ -102,18 +108,21 @@ export default function ReportsPage() {
     ? neighborhoodsRaw
     : MOCK_NEIGHBORHOODS;
 
-  // Compute stats
-  const totalAssignments = assignments?.length ?? 0;
-  const completed = assignments?.filter(a => a.status === 'completed') ?? [];
-  const cancelled = assignments?.filter(a => a.status === 'cancelled') ?? [];
+  // Derived stats
+  const totalAssignments = assignments.length;
+  const completed = assignments.filter(a => a.status === 'completed');
+  const cancelled = assignments.filter(a => a.status === 'cancelled');
   const totalHours = completed.reduce((sum, a) => sum + (Number(a.hours_worked) || 0), 0);
   const totalPay = completed.reduce((sum, a) => sum + (Number(a.total_pay) || 0), 0);
+  const completionRate = totalAssignments > 0
+    ? Math.round((completed.length / totalAssignments) * 100)
+    : 0;
 
-  // Status distribution for pie chart
-  const statusCounts = assignments?.reduce((acc, a) => {
+  // Status distribution for pie
+  const statusCounts = assignments.reduce((acc, a) => {
     acc[a.status] = (acc[a.status] || 0) + 1;
     return acc;
-  }, {} as Record<string, number>) ?? {};
+  }, {} as Record<string, number>);
 
   const statusLabels: Record<string, string> = {
     pending: 'ממתין',
@@ -129,12 +138,36 @@ export default function ReportsPage() {
     value: count,
   }));
 
-  // Assignments per kindergarten for bar chart
-  const perKg = assignments?.reduce((acc, a) => {
-    acc[a.kindergarten_name] = (acc[a.kindergarten_name] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>) ?? {};
-  const kgBarData = Object.entries(perKg).map(([name, count]) => ({ name, count }));
+  // Daily trend data
+  const dailyTrend = useMemo(() => {
+    const byDate: Record<string, { total: number; completed: number }> = {};
+    assignments.forEach(a => {
+      if (!byDate[a.assignment_date]) byDate[a.assignment_date] = { total: 0, completed: 0 };
+      byDate[a.assignment_date].total++;
+      if (a.status === 'completed' || a.status === 'arrived') byDate[a.assignment_date].completed++;
+    });
+    return Object.entries(byDate)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, v]) => ({
+        label: format(new Date(date + 'T00:00:00'), 'd/M'),
+        total: v.total,
+        completed: v.completed,
+      }));
+  }, [assignments]);
+
+  // Substitute leaderboard
+  const subLeaderboard = useMemo(() => {
+    const byName: Record<string, { name: string; total: number; completed: number }> = {};
+    assignments.forEach(a => {
+      const name = `${a.substitute_first_name} ${a.substitute_last_name}`;
+      if (!byName[name]) byName[name] = { name, total: 0, completed: 0 };
+      byName[name].total++;
+      if (a.status === 'completed' || a.status === 'arrived') byName[name].completed++;
+    });
+    return Object.values(byName)
+      .sort((a, b) => b.completed - a.completed)
+      .slice(0, 5);
+  }, [assignments]);
 
   const handleExport = async () => {
     try {
@@ -192,25 +225,50 @@ export default function ReportsPage() {
           <div className="text-slate-600 text-sm font-medium mt-0.5">סה"כ שיבוצים</div>
         </div>
         <div className="card p-5">
-          <div className="text-2xl font-black text-mint-500">{completed.length}</div>
-          <div className="text-slate-600 text-sm font-medium mt-0.5">הושלמו</div>
+          <div className="text-2xl font-black text-mint-500">{completionRate}%</div>
+          <div className="text-slate-600 text-sm font-medium mt-0.5">אחוז השלמה</div>
         </div>
         <div className="card p-5">
           <div className="text-2xl font-black text-navy-900">{totalHours.toFixed(1)}</div>
           <div className="text-slate-600 text-sm font-medium mt-0.5">שעות עבודה</div>
         </div>
         <div className="card p-5">
-          <div className="text-2xl font-black text-violet-500">{totalPay > 0 ? `₪${totalPay.toLocaleString()}` : '—'}</div>
+          <div className="text-2xl font-black text-violet-500">
+            {totalPay > 0 ? `₪${Math.round(totalPay).toLocaleString()}` : '—'}
+          </div>
           <div className="text-slate-600 text-sm font-medium mt-0.5">סה"כ לתשלום</div>
         </div>
       </div>
 
-      {/* Charts */}
+      {/* Daily trend + status pie */}
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Status pie chart */}
+        {/* Daily trend line chart */}
         <div className="card p-6">
           <h3 className="font-bold text-navy-900 mb-4 flex items-center gap-2">
             <TrendingUp size={16} className="text-mint-500" />
+            מגמה יומית
+          </h3>
+          {dailyTrend.length > 0 ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={dailyTrend} margin={{ top: 4, right: 4, left: -28, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#64748b' }} interval={Math.floor(dailyTrend.length / 6)} />
+                <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} allowDecimals={false} />
+                <Tooltip formatter={(v, name) => [v, name === 'total' ? 'סה"כ' : 'הושלמו']} />
+                <Legend formatter={n => n === 'total' ? 'סה"כ שיבוצים' : 'הושלמו'} />
+                <Line type="monotone" dataKey="total" stroke="#3B82F6" strokeWidth={2} dot={false} name="total" />
+                <Line type="monotone" dataKey="completed" stroke="#17C98A" strokeWidth={2} dot={false} name="completed" />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="text-sm text-slate-400 text-center py-12">אין נתונים</p>
+          )}
+        </div>
+
+        {/* Status pie */}
+        <div className="card p-6">
+          <h3 className="font-bold text-navy-900 mb-4 flex items-center gap-2">
+            <BarChart3 size={16} className="text-sky-500" />
             התפלגות סטטוסים
           </h3>
           {pieData.length > 0 ? (
@@ -236,31 +294,75 @@ export default function ReportsPage() {
             <p className="text-sm text-slate-400 text-center py-12">אין נתונים</p>
           )}
         </div>
+      </div>
 
-        {/* Assignments per kindergarten */}
+      {/* Substitute leaderboard + per-kindergarten bar */}
+      <div className="grid lg:grid-cols-2 gap-6">
+        {/* Leaderboard */}
+        <div className="card p-6">
+          <h3 className="font-bold text-navy-900 mb-4 flex items-center gap-2">
+            <Award size={16} className="text-amber-500" />
+            מחליפות מובילות
+          </h3>
+          <div className="space-y-3">
+            {subLeaderboard.map((sub, i) => (
+              <div key={sub.name} className="flex items-center gap-3">
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                  i === 0 ? 'bg-amber-100 text-amber-700' :
+                  i === 1 ? 'bg-slate-100 text-slate-600' :
+                  i === 2 ? 'bg-orange-100 text-orange-600' :
+                  'bg-slate-50 text-slate-500'
+                }`}>
+                  {i + 1}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-navy-900 truncate">{sub.name}</p>
+                    <span className="text-xs text-slate-500 flex-shrink-0">{sub.completed}/{sub.total}</span>
+                  </div>
+                  <div className="h-1.5 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
+                    <div
+                      className="h-full bg-mint-500 rounded-full"
+                      style={{ width: `${sub.total > 0 ? (sub.completed / sub.total) * 100 : 0}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Per-kindergarten bar */}
         <div className="card p-6">
           <h3 className="font-bold text-navy-900 mb-4 flex items-center gap-2">
             <FileText size={16} className="text-sky-500" />
             שיבוצים לפי גן
           </h3>
-          {kgBarData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={kgBarData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} />
-                <YAxis tick={{ fontSize: 11, fill: '#64748b' }} />
-                <Tooltip formatter={(v) => [v, 'שיבוצים']} />
-                <Bar dataKey="count" fill="#3B82F6" radius={[4, 4, 0, 0]} name="שיבוצים" />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <p className="text-sm text-slate-400 text-center py-12">אין נתונים</p>
-          )}
+          {(() => {
+            const perKg = assignments.reduce((acc, a) => {
+              acc[a.kindergarten_name] = (acc[a.kindergarten_name] || 0) + 1;
+              return acc;
+            }, {} as Record<string, number>);
+            const kgBarData = Object.entries(perKg).map(([name, count]) => ({ name, count })).slice(0, 10);
+            return kgBarData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={kgBarData} margin={{ top: 4, right: 4, left: -28, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#64748b' }} />
+                  <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} allowDecimals={false} />
+                  <Tooltip formatter={(v) => [v, 'שיבוצים']} />
+                  <Bar dataKey="count" fill="#3B82F6" radius={[4, 4, 0, 0]} name="שיבוצים" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-sm text-slate-400 text-center py-12">אין נתונים</p>
+            );
+          })()}
         </div>
       </div>
 
       {/* Neighborhood coverage table */}
-      {neighborhoods && neighborhoods.length > 0 && (
+      {neighborhoods.length > 0 && (
         <div className="card overflow-hidden">
           <div className="p-5 border-b border-slate-100">
             <h3 className="font-bold text-navy-900">כיסוי לפי שכונה</h3>
