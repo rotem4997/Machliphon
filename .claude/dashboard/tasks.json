@@ -1,0 +1,94 @@
+[
+  {
+    "id": "t001",
+    "title": "Add pagination to substitutes list",
+    "description": "Backend: LIMIT/OFFSET on GET /api/substitutes. Frontend: page controls with Hebrew labels.",
+    "priority": "high",
+    "status": "done",
+    "assignedTo": "team-lead",
+    "createdAt": "2026-05-07T06:00:00.000Z",
+    "updatedAt": "2026-05-07T18:24:06.386Z",
+    "completedAt": "2026-05-07T18:24:06.386Z"
+  },
+  {
+    "id": "t002",
+    "title": "Search & filter substitutes by name / status",
+    "description": "Add ?search=&status= query params to GET /api/substitutes. Frontend search input with debounce.",
+    "priority": "high",
+    "status": "pending",
+    "assignedTo": null,
+    "createdAt": "2026-05-07T06:01:00.000Z"
+  },
+  {
+    "id": "t003",
+    "title": "Unread notification badge in nav",
+    "description": "GET /api/notifications/unread-count. Show red badge on bell icon in AppLayout. Auto-poll every 30s.",
+    "priority": "medium",
+    "status": "pending",
+    "assignedTo": null,
+    "createdAt": "2026-05-07T06:02:00.000Z"
+  },
+  {
+    "id": "t004",
+    "title": "Dashboard charts with Recharts",
+    "description": "Add BarChart for absences-per-week and PieChart for assignment coverage to the authority manager dashboard.",
+    "priority": "medium",
+    "status": "pending",
+    "assignedTo": null,
+    "createdAt": "2026-05-07T06:03:00.000Z"
+  },
+  {
+    "id": "t005",
+    "title": "Export substitutes list to CSV",
+    "description": "Button on substitutes page: download CSV with name, phone, status, assignments count. Client-side generation.",
+    "priority": "low",
+    "status": "pending",
+    "assignedTo": null,
+    "createdAt": "2026-05-07T06:04:00.000Z"
+  },
+  {
+    "id": "t006",
+    "title": "Mark substitute as unavailable for date range",
+    "description": "New table: substitute_unavailability (substitute_id, from_date, to_date, reason). API + frontend calendar UI.",
+    "priority": "high",
+    "status": "pending",
+    "assignedTo": null,
+    "createdAt": "2026-05-07T06:05:00.000Z"
+  },
+  {
+    "id": "t007",
+    "title": "Assignment history page per substitute",
+    "description": "GET /api/substitutes/:id/assignments — list all past/current assignments. New page with RTL table.",
+    "priority": "medium",
+    "status": "pending",
+    "assignedTo": null,
+    "createdAt": "2026-05-07T06:06:00.000Z"
+  },
+  {
+    "id": "t008",
+    "title": "Kindergarten detail page",
+    "description": "Page showing kindergarten info, its manager, absence history, and assigned substitutes.",
+    "priority": "medium",
+    "status": "pending",
+    "assignedTo": null,
+    "createdAt": "2026-05-07T06:07:00.000Z"
+  },
+  {
+    "id": "t009",
+    "title": "Add global error boundary to React app",
+    "description": "Wrap <App> in an ErrorBoundary that shows a Hebrew fallback UI instead of a blank screen.",
+    "priority": "medium",
+    "status": "pending",
+    "assignedTo": null,
+    "createdAt": "2026-05-07T06:08:00.000Z"
+  },
+  {
+    "id": "t010",
+    "title": "Authority isolation security audit",
+    "description": "Review all GET endpoints — verify every query filters by authority_id from JWT. Fix any gaps.",
+    "priority": "high",
+    "status": "pending",
+    "assignedTo": null,
+    "createdAt": "2026-05-07T06:09:00.000Z"
+  }
+]

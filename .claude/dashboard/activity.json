@@ -1,0 +1,118 @@
+[
+  {
+    "agent": "team-lead",
+    "event": "task_done",
+    "title": "Add pagination to substitutes list",
+    "ts": "2026-05-07T18:24:06.386Z"
+  },
+  {
+    "agent": "react-specialist",
+    "event": "status",
+    "status": "done",
+    "task": "✅ SubstitutesPage pagination + AgentDashboard page",
+    "progress": 100,
+    "ts": "2026-05-07T18:24:06.376Z"
+  },
+  {
+    "agent": "backend-developer",
+    "event": "status",
+    "status": "done",
+    "task": "✅ Pagination done — GET /api/substitutes",
+    "progress": 100,
+    "ts": "2026-05-07T18:24:06.376Z"
+  },
+  {
+    "agent": "team-lead",
+    "event": "status",
+    "status": "reviewing",
+    "task": "Committing t001 + dashboard work",
+    "progress": 90,
+    "ts": "2026-05-07T18:24:06.376Z"
+  },
+  {
+    "agent": "react-specialist",
+    "event": "status",
+    "status": "working",
+    "task": "Finalizing AgentDashboard.tsx + SubstitutesPage pagination",
+    "progress": 80,
+    "ts": "2026-05-07T18:23:09.341Z"
+  },
+  {
+    "agent": "team-lead",
+    "event": "status",
+    "status": "reviewing",
+    "task": "Wiring dashboard into React app at /agent-dashboard",
+    "progress": 60,
+    "ts": "2026-05-07T18:23:09.341Z"
+  },
+  {
+    "agent": "react-specialist",
+    "event": "status",
+    "status": "working",
+    "task": "Updating SubstitutesPage — server-side pagination + search",
+    "progress": 45,
+    "ts": "2026-05-07T18:20:01.711Z"
+  },
+  {
+    "agent": "backend-developer",
+    "event": "status",
+    "status": "done",
+    "task": "✅ Pagination + search added to GET /api/substitutes",
+    "progress": 100,
+    "ts": "2026-05-07T18:20:01.711Z"
+  },
+  {
+    "agent": "react-specialist",
+    "event": "status",
+    "status": "working",
+    "task": "Reading SubstitutesPage.tsx layout",
+    "progress": 20,
+    "ts": "2026-05-07T18:19:38.098Z"
+  },
+  {
+    "agent": "backend-developer",
+    "event": "status",
+    "status": "working",
+    "task": "Adding page/limit/search to GET /api/substitutes + count query",
+    "progress": 40,
+    "ts": "2026-05-07T18:19:38.097Z"
+  },
+  {
+    "agent": "react-specialist",
+    "event": "status",
+    "status": "working",
+    "task": "Building Pagination component (Hebrew labels)",
+    "progress": 5,
+    "ts": "2026-05-07T18:19:03.254Z"
+  },
+  {
+    "agent": "backend-developer",
+    "event": "status",
+    "status": "working",
+    "task": "Adding pagination to GET /api/substitutes",
+    "progress": 5,
+    "ts": "2026-05-07T18:19:03.254Z"
+  },
+  {
+    "agent": "team-lead",
+    "event": "status",
+    "status": "reviewing",
+    "task": "Delegating t001 to backend-developer + react-specialist",
+    "progress": 20,
+    "ts": "2026-05-07T18:19:03.253Z"
+  },
+  {
+    "agent": "team-lead",
+    "event": "task_in-progress",
+    "title": "Add pagination to substitutes list",
+    "ts": "2026-05-07T18:18:58.452Z"
+  },
+  {
+    "agent": "team-lead",
+    "event": "status",
+    "status": "working",
+    "task": "Reviewing backlog, assigning t001: substitutes pagination",
+    "progress": 10,
+    "ts": "2026-05-07T18:18:58.441Z"
+  }
+]

@@ -19,6 +19,7 @@ import AvailabilityPage from './pages/AvailabilityPage';
 import KnownAbsencesPage from './pages/KnownAbsencesPage';
 import ManagerKindergartensPage from './pages/ManagerKindergartensPage';
 import MLInsightsPage from './pages/MLInsightsPage';
+import AgentDashboard from './pages/AgentDashboard';
 import { useAuthStore } from './context/authStore';
 
 // Clear any stale demo tokens left over from previous sessions.
@@ -92,6 +93,7 @@ export default function App() {
             </Route>
           </Route>
 
+          <Route path="/agent-dashboard" element={<AgentDashboard />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>

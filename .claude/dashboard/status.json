@@ -1,0 +1,65 @@
+{
+  "team-lead": {
+    "status": "reviewing",
+    "task": "Committing t001 + dashboard work",
+    "progress": 90,
+    "updatedAt": "2026-05-07T18:24:06.376Z"
+  },
+  "feature-planner": {
+    "status": "idle",
+    "task": "—",
+    "progress": 0
+  },
+  "backend-developer": {
+    "status": "done",
+    "task": "✅ Pagination done — GET /api/substitutes",
+    "progress": 100,
+    "updatedAt": "2026-05-07T18:24:06.376Z"
+  },
+  "react-specialist": {
+    "status": "done",
+    "task": "✅ SubstitutesPage pagination + AgentDashboard page",
+    "progress": 100,
+    "updatedAt": "2026-05-07T18:24:06.376Z"
+  },
+  "sql-pro": {
+    "status": "idle",
+    "task": "—",
+    "progress": 0
+  },
+  "api-designer": {
+    "status": "idle",
+    "task": "—",
+    "progress": 0
+  },
+  "typescript-pro": {
+    "status": "idle",
+    "task": "—",
+    "progress": 0
+  },
+  "security-engineer": {
+    "status": "idle",
+    "task": "—",
+    "progress": 0
+  },
+  "code-reviewer": {
+    "status": "idle",
+    "task": "—",
+    "progress": 0
+  },
+  "deployment-engineer": {
+    "status": "idle",
+    "task": "—",
+    "progress": 0
+  },
+  "debugger": {
+    "status": "idle",
+    "task": "—",
+    "progress": 0
+  },
+  "qa-expert": {
+    "status": "idle",
+    "task": "—",
+    "progress": 0
+  }
+}

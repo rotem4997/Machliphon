@@ -17,6 +17,7 @@ import activityRoutes from './routes/activity';
 import knownAbsencesRoutes from './routes/known-absences';
 import managerKindergartensRoutes from './routes/manager-kindergartens';
 import mlRoutes from './routes/ml';
+import agentDashboardRoutes from './routes/agent-dashboard';
 import { requestIdMiddleware } from './middleware/requestId';
 import { errorHandler } from './middleware/errorHandler';
 
@@ -127,6 +128,7 @@ app.use('/api/activity', activityRoutes);
 app.use('/api/known-absences', knownAbsencesRoutes);
 app.use('/api/manager-kindergartens', managerKindergartensRoutes);
 app.use('/api/ml', mlRoutes);
+app.use('/api/agent', agentDashboardRoutes);
 
 // ── Serve frontend in production ─────────────────────────────
 if (process.env.NODE_ENV === 'production') {

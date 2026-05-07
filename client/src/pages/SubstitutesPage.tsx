@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Search, Plus, Phone, Mail, MapPin, CheckCircle, XCircle,
@@ -7,7 +7,15 @@ import {
 import api from '@/utils/api';
 import toast from 'react-hot-toast';
 
-// ─── Types (matches API response from GET /api/substitutes) ──
+// ─── Types ────────────────────────────────────────────────────
+interface PaginatedSubstitutes {
+  data: Substitute[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 interface Substitute {
   id: string;
   first_name: string;
@@ -81,7 +89,9 @@ function exportToCSV(subs: Substitute[]) {
 
 export default function SubstitutesPage() {
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
   const [selectedSub, setSelectedSub] = useState<Substitute | null>(null);
   const [rejectTarget, setRejectTarget] = useState<Substitute | null>(null);
@@ -91,10 +101,26 @@ export default function SubstitutesPage() {
 
   const queryClient = useQueryClient();
 
-  const { data: substitutes = [], isLoading, isError } = useQuery<Substitute[]>({
-    queryKey: ['substitutes'],
-    queryFn: () => api.get('/substitutes').then(r => r.data),
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 350);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => { setPage(1); }, [debouncedSearch, filterStatus]);
+
+  const { data: result, isLoading, isError } = useQuery<PaginatedSubstitutes>({
+    queryKey: ['substitutes', page, debouncedSearch, filterStatus],
+    queryFn: () => {
+      const params = new URLSearchParams({ page: String(page), limit: '20' });
+      if (debouncedSearch) params.set('search', debouncedSearch);
+      if (filterStatus) params.set('status', filterStatus);
+      return api.get(`/substitutes?${params}`).then(r => r.data);
+    },
   });
+
+  const substitutes = result?.data ?? [];
+  const total = result?.total ?? 0;
+  const totalPages = result?.totalPages ?? 1;
 
   if (isError) {
     return (
@@ -147,23 +173,17 @@ export default function SubstitutesPage() {
     onError: () => toast.error('שגיאה בעדכון תיק עובד'),
   });
 
-  const filtered = substitutes.filter(s => {
-    if (search && !`${s.first_name} ${s.last_name} ${s.phone} ${s.email}`.includes(search)) return false;
-    if (filterStatus && s.status !== filterStatus) return false;
-    return true;
-  });
-
   return (
     <div className="space-y-6 fade-in">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-black text-navy-900">מחליפות</h1>
-          <p className="text-slate-500 text-sm mt-0.5">{substitutes.length} מחליפות ברשות</p>
+          <p className="text-slate-500 text-sm mt-0.5">{total} מחליפות ברשות</p>
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => exportToCSV(filtered)}
+            onClick={() => exportToCSV(substitutes)}
             className="btn-secondary flex items-center gap-2 text-sm"
           >
             <Download size={16} />
@@ -218,8 +238,8 @@ export default function SubstitutesPage() {
                     <td colSpan={7} className="px-5 py-4"><div className="h-10 skeleton rounded" /></td>
                   </tr>
                 ))
-              ) : filtered.length > 0 ? (
-                filtered.map(sub => (
+              ) : substitutes.length > 0 ? (
+                substitutes.map(sub => (
                   <tr key={sub.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-4 sm:px-5 py-4">
                       <div className="flex items-center gap-3">
@@ -310,6 +330,30 @@ export default function SubstitutesPage() {
           </table>
         </div>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-slate-500">מציג {substitutes.length} מתוך {total} מחליפות</span>
+          <div className="flex items-center gap-2">
+            <button
+              disabled={page <= 1}
+              onClick={() => setPage(p => p - 1)}
+              className="btn-secondary text-sm disabled:opacity-40"
+            >
+              הקודם
+            </button>
+            <span className="text-sm text-slate-600 px-2">עמוד {page} מתוך {totalPages}</span>
+            <button
+              disabled={page >= totalPages}
+              onClick={() => setPage(p => p + 1)}
+              className="btn-secondary text-sm disabled:opacity-40"
+            >
+              הבא
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Reject Modal */}
       {rejectTarget && (
