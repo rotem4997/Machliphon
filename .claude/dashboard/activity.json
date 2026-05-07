@@ -1,5 +1,237 @@
 [
   {
+    "agent": "debugger",
+    "event": "status",
+    "status": "idle",
+    "task": "—",
+    "progress": 0,
+    "ts": "2026-05-07T18:34:53.703Z"
+  },
+  {
+    "agent": "team-lead",
+    "event": "status",
+    "status": "idle",
+    "task": "Pushed. Awaiting next task assignment.",
+    "progress": 0,
+    "ts": "2026-05-07T18:34:53.703Z"
+  },
+  {
+    "agent": "team-lead",
+    "event": "status",
+    "status": "working",
+    "task": "Committing data fixes, pushing",
+    "progress": 80,
+    "ts": "2026-05-07T18:34:36.161Z"
+  },
+  {
+    "agent": "debugger",
+    "event": "status",
+    "status": "done",
+    "task": "✅ Fixed authorities UNIQUE + seed idempotency + super_admin fallback",
+    "progress": 100,
+    "ts": "2026-05-07T18:34:36.161Z"
+  },
+  {
+    "agent": "debugger",
+    "event": "status",
+    "status": "working",
+    "task": "Fixing Bug 1 (authorities UNIQUE), Bug 5 (super_admin substitutes list)",
+    "progress": 10,
+    "ts": "2026-05-07T18:33:41.915Z"
+  },
+  {
+    "agent": "team-lead",
+    "event": "status",
+    "status": "working",
+    "task": "Fixing authorities UNIQUE constraint + seed idempotency",
+    "progress": 30,
+    "ts": "2026-05-07T18:33:41.914Z"
+  },
+  {
+    "agent": "sql-pro",
+    "event": "status",
+    "status": "done",
+    "task": "✅ Root cause: authorities has no UNIQUE constraint — duplicate rows break authority scoping",
+    "progress": 100,
+    "ts": "2026-05-07T18:33:41.914Z"
+  },
+  {
+    "agent": "team-lead",
+    "event": "status",
+    "status": "working",
+    "task": "Triaging: demo login works but actions fail — data gap investigation",
+    "progress": 20,
+    "ts": "2026-05-07T18:32:07.252Z"
+  },
+  {
+    "agent": "sql-pro",
+    "event": "status",
+    "status": "working",
+    "task": "Investigating demo data integrity — tables, FK chains, seed data",
+    "progress": 10,
+    "ts": "2026-05-07T18:32:07.251Z"
+  },
+  {
+    "agent": "react-specialist",
+    "event": "task_done",
+    "title": "Unread notification badge in nav",
+    "ts": "2026-05-07T18:26:44.257Z"
+  },
+  {
+    "agent": "team-lead",
+    "event": "status",
+    "status": "reviewing",
+    "task": "Reviewing t003 output, committing",
+    "progress": 80,
+    "ts": "2026-05-07T18:26:44.248Z"
+  },
+  {
+    "agent": "backend-developer",
+    "event": "status",
+    "status": "done",
+    "task": "✅ /api/notifications/unread-count already existed",
+    "progress": 100,
+    "ts": "2026-05-07T18:26:44.248Z"
+  },
+  {
+    "agent": "react-specialist",
+    "event": "status",
+    "status": "done",
+    "task": "✅ Notification badge wired to /api/notifications/unread-count, polls every 30s",
+    "progress": 100,
+    "ts": "2026-05-07T18:26:44.247Z"
+  },
+  {
+    "agent": "team-lead",
+    "event": "status",
+    "status": "reviewing",
+    "task": "t002 already done (part of t001 pagination). Focusing on t003.",
+    "progress": 30,
+    "ts": "2026-05-07T18:26:06.692Z"
+  },
+  {
+    "agent": "backend-developer",
+    "event": "task_done",
+    "title": "Search & filter substitutes by name / status",
+    "ts": "2026-05-07T18:26:06.682Z"
+  },
+  {
+    "agent": "react-specialist",
+    "event": "task_in-progress",
+    "title": "Unread notification badge in nav",
+    "ts": "2026-05-07T18:25:58.494Z"
+  },
+  {
+    "agent": "team-lead",
+    "event": "task_in-progress",
+    "title": "Search & filter substitutes by name / status",
+    "ts": "2026-05-07T18:25:58.485Z"
+  },
+  {
+    "agent": "react-specialist",
+    "event": "status",
+    "status": "working",
+    "task": "Adding notification badge to AppLayout nav",
+    "progress": 5,
+    "ts": "2026-05-07T18:25:58.476Z"
+  },
+  {
+    "agent": "backend-developer",
+    "event": "status",
+    "status": "working",
+    "task": "Building GET /api/notifications/unread-count",
+    "progress": 5,
+    "ts": "2026-05-07T18:25:58.476Z"
+  },
+  {
+    "agent": "team-lead",
+    "event": "status",
+    "status": "working",
+    "task": "Assigning t002 (search/filter) + t003 (notification badge)",
+    "progress": 10,
+    "ts": "2026-05-07T18:25:58.475Z"
+  },
+  {
+    "agent": "security-engineer",
+    "event": "task_done",
+    "title": "Authority isolation security audit",
+    "ts": "2026-05-07T18:25:41.722Z"
+  },
+  {
+    "agent": "react-specialist",
+    "event": "task_done",
+    "title": "Add global error boundary to React app",
+    "ts": "2026-05-07T18:25:41.713Z"
+  },
+  {
+    "agent": "team-lead",
+    "event": "status",
+    "status": "working",
+    "task": "Reviewing audit results, assigning t003 + t002",
+    "progress": 15,
+    "ts": "2026-05-07T18:25:41.704Z"
+  },
+  {
+    "agent": "react-specialist",
+    "event": "status",
+    "status": "done",
+    "task": "✅ ErrorBoundary improved + outer wrapper in main.tsx",
+    "progress": 100,
+    "ts": "2026-05-07T18:25:41.703Z"
+  },
+  {
+    "agent": "security-engineer",
+    "event": "status",
+    "status": "done",
+    "task": "✅ Audit complete — all routes correctly scoped, no gaps",
+    "progress": 100,
+    "ts": "2026-05-07T18:25:41.703Z"
+  },
+  {
+    "agent": "security-engineer",
+    "event": "task_in-progress",
+    "title": "Authority isolation security audit",
+    "ts": "2026-05-07T18:24:29.110Z"
+  },
+  {
+    "agent": "react-specialist",
+    "event": "task_in-progress",
+    "title": "Add global error boundary to React app",
+    "ts": "2026-05-07T18:24:29.101Z"
+  },
+  {
+    "agent": "backend-developer",
+    "event": "status",
+    "status": "idle",
+    "task": "—",
+    "progress": 0,
+    "ts": "2026-05-07T18:24:29.092Z"
+  },
+  {
+    "agent": "react-specialist",
+    "event": "status",
+    "status": "working",
+    "task": "Adding ErrorBoundary to React app root",
+    "progress": 5,
+    "ts": "2026-05-07T18:24:29.092Z"
+  },
+  {
+    "agent": "security-engineer",
+    "event": "status",
+    "status": "working",
+    "task": "Auditing authority_id isolation on all GET routes",
+    "progress": 5,
+    "ts": "2026-05-07T18:24:29.092Z"
+  },
+  {
+    "agent": "team-lead",
+    "event": "status",
+    "status": "working",
+    "task": "Assigning t009 + t010 in parallel",
+    "progress": 10,
+    "ts": "2026-05-07T18:24:29.091Z"
+  },
+  {
     "agent": "team-lead",
     "event": "task_done",
     "title": "Add pagination to substitutes list",
