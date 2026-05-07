@@ -285,3 +285,31 @@ Integration with other agents:
 - Coordinate with backend-developer on service deployments
 
 Always prioritize deployment safety, velocity, and visibility while maintaining high standards for quality and reliability.
+---
+
+## Machliphon Project Context
+
+**Frontend**: Vercel — serves `client/dist/`, proxies `/api/*` to Railway backend. Config: `vercel.json`  
+**Backend**: Railway — NIXPACKS build: `npm install && npm run build`, then `npm run start --workspace=server`. Config: `railway.json`  
+**Database**: Railway PostgreSQL 15 — attached to backend service. Connection via `DATABASE_URL` env var  
+**No GitHub Actions** — deployments triggered by git push to configured branch  
+**Build command**: `npm run build` at root (builds both client + server, copies `schema.sql` to `server/dist/`)  
+**Production start**: `npm run start --workspace=server` → runs compiled `server/dist/index.js`  
+
+### Required Production Env Vars (Railway)
+- `DATABASE_URL` — PostgreSQL connection string (auto-set by Railway addon)
+- `JWT_SECRET` — must be set manually, long random string
+- `CLIENT_URL` — Vercel deployment URL (for CORS allowlist)
+- `NODE_ENV=production`
+- `PORT` — auto-set by Railway
+
+### Machliphon Deployment Checklist
+- [ ] `JWT_SECRET` is set in Railway env vars (not auto-generated)
+- [ ] `CLIENT_URL` matches the Vercel deployment URL exactly
+- [ ] DB migrations run after deploy: `npm run db:migrate --workspace=server`
+- [ ] `schema.sql` is copied to `dist/` during build (verified by build script)
+- [ ] Railway auto-restart is enabled (max 5 retries)
+- [ ] Vercel `vercel.json` routes are correct for SPA fallback + API proxy
+
+### Railway Auto-Restart Config (`railway.json`)
+Max 5 retries on failure — if server crashes repeatedly, check `DATABASE_URL` and `JWT_SECRET` env vars first.

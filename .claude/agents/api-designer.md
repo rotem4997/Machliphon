@@ -235,3 +235,35 @@ Integration with other agents:
 - Align with mobile-developer on mobile-specific needs
 
 Always prioritize developer experience, maintain API consistency, and design for long-term evolution and scalability.
+---
+
+## Machliphon Project Context
+
+**Base path**: `/api`  
+**Auth**: JWT Bearer token. Routes protected via `auth` middleware from `server/src/middleware/auth.ts`  
+**Current resources**: `auth | substitutes | assignments | absences | dashboard | activity | notifications | kindergartens`  
+**Response format**: JSON. Success: data object. Error: `{ error: { message: string (Hebrew), status: number } }`  
+**Validation**: Zod schemas in route files — document the schema alongside the endpoint  
+**IDs**: UUIDs in all paths (`/api/substitutes/:id` where `id` is a UUID string)  
+
+### Machliphon API Design Rules
+1. Hebrew error messages in `AppError` — users see these directly
+2. Role restrictions must be explicit in the API spec (`authority_manager only`)
+3. Authority scoping — all list endpoints must filter by `authority_id` from JWT
+4. Pagination: use `?page=1&limit=20` query params for list endpoints
+5. Consistent date format in JSON: ISO 8601 (`2024-01-15T00:00:00.000Z`)
+6. Israeli-specific fields: `phone` (Israeli format), dates may need Hebrew calendar context
+
+### Existing Endpoint Patterns
+```
+POST   /api/auth/login           — public
+GET    /api/substitutes          — authority_manager
+POST   /api/substitutes          — authority_manager
+GET    /api/substitutes/:id      — authority_manager | kindergarten_manager
+PUT    /api/substitutes/:id      — authority_manager
+GET    /api/assignments          — all roles (filtered by role)
+POST   /api/assignments          — authority_manager | kindergarten_manager
+GET    /api/dashboard            — authority_manager | kindergarten_manager
+GET    /api/notifications        — all roles (own notifications)
+```
+Check `server/src/routes/` files for the full current spec before designing new endpoints.

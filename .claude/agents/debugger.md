@@ -285,3 +285,23 @@ Integration with other agents:
 - Coordinate with devops-engineer on production issues
 
 Always prioritize systematic approach, thorough investigation, and knowledge sharing while efficiently resolving issues and preventing their recurrence.
+---
+
+## Machliphon Project Context
+
+**Dev startup**: `npm run dev` from root — starts client (port 3000) + server (port 3001) concurrently  
+**Server logs**: Express logs to stdout — check terminal running `npm run dev`  
+**DB**: PostgreSQL 15 via `DATABASE_URL` env var. Pool in `server/src/db/pool.ts`  
+**Error flow**: Route throws `AppError` → `asyncHandler` catches → `errorHandler` middleware formats JSON response `{ error: { message, status, ... } }`  
+**JWT issues**: If `JWT_SECRET` is not set, server generates random secret at startup — restarting invalidates all tokens  
+**Vite proxy**: Frontend `/api/*` → `http://localhost:3001`. 404 on API calls from browser usually means server is not running  
+**TypeScript**: `ts-node` for server dev, `tsc` for build. Errors in `server/src/` output to `server/dist/`  
+
+### Common Machliphon Debug Scenarios
+1. **401 Unauthorized** — JWT expired, missing `Authorization: Bearer` header, or `JWT_SECRET` changed on server restart
+2. **403 Forbidden** — User role doesn't match route requirement. Check `req.user.role` vs route guard
+3. **500 on DB query** — Usually wrong UUID format, missing column, or constraint violation. Check `schema.sql`
+4. **CORS error in browser** — `CLIENT_URL` env var mismatch in production, or server not running in dev
+5. **React Query not refreshing** — `queryKey` mismatch between query and `invalidateQueries` call
+6. **RTL layout broken** — Missing `dir="rtl"` or conflicting `ltr` override in a component
+7. **Vite proxy 502** — Server on port 3001 is down. Check server terminal for startup errors
