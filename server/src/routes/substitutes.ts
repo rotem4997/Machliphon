@@ -24,15 +24,49 @@ const createSubstituteSchema = z.object({
 const router = Router();
 router.use(authenticate);
 
-// GET /api/substitutes - list substitutes for authority
+// GET /api/substitutes - list substitutes for authority (paginated)
 router.get('/', requireRole('manager', 'authority_admin', 'super_admin'), asyncHandler(async (req: AuthRequest, res: Response) => {
   const authorityId = req.user!.role === 'super_admin'
     ? req.query.authorityId
     : req.user!.authority_id;
 
-  const { status, neighborhood, permitValid } = req.query;
+  const { status, neighborhood, permitValid, search } = req.query;
+  const page  = Math.max(1, parseInt(req.query.page  as string) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+  const offset = (page - 1) * limit;
 
-  let sql = `
+  const whereClauses: string[] = ['s.authority_id = $1'];
+  const params: unknown[] = [authorityId];
+  let paramIdx = 2;
+
+  if (status) {
+    whereClauses.push(`s.status = $${paramIdx++}`);
+    params.push(status);
+  }
+  if (neighborhood) {
+    whereClauses.push(`s.neighborhood = $${paramIdx++}`);
+    params.push(neighborhood);
+  }
+  if (permitValid === 'true') {
+    whereClauses.push(`s.work_permit_valid = true AND s.work_permit_expiry > CURRENT_DATE`);
+  } else if (permitValid === 'false') {
+    whereClauses.push(`(s.work_permit_valid = false OR s.work_permit_expiry <= CURRENT_DATE)`);
+  }
+  if (search) {
+    whereClauses.push(`(u.first_name ILIKE $${paramIdx} OR u.last_name ILIKE $${paramIdx} OR CONCAT(u.first_name, ' ', u.last_name) ILIKE $${paramIdx} OR u.phone ILIKE $${paramIdx})`);
+    params.push(`%${search}%`);
+    paramIdx++;
+  }
+
+  const where = whereClauses.join(' AND ');
+
+  const countResult = await query(
+    `SELECT COUNT(*) FROM substitutes s JOIN users u ON s.user_id = u.id WHERE ${where}`,
+    params
+  );
+  const total = parseInt(countResult.rows[0].count, 10);
+
+  const dataResult = await query(`
     SELECT
       s.*,
       u.first_name, u.last_name, u.email, u.phone,
@@ -48,29 +82,18 @@ router.get('/', requireRole('manager', 'authority_admin', 'super_admin'), asyncH
        AND a.status = 'completed') as assignments_this_month
     FROM substitutes s
     JOIN users u ON s.user_id = u.id
-    WHERE s.authority_id = $1
-  `;
-  const params: unknown[] = [authorityId];
-  let paramIdx = 2;
+    WHERE ${where}
+    ORDER BY u.last_name, u.first_name
+    LIMIT $${paramIdx} OFFSET $${paramIdx + 1}
+  `, [...params, limit, offset]);
 
-  if (status) {
-    sql += ` AND s.status = $${paramIdx++}`;
-    params.push(status);
-  }
-  if (neighborhood) {
-    sql += ` AND s.neighborhood = $${paramIdx++}`;
-    params.push(neighborhood);
-  }
-  if (permitValid === 'true') {
-    sql += ` AND s.work_permit_valid = true AND s.work_permit_expiry > CURRENT_DATE`;
-  } else if (permitValid === 'false') {
-    sql += ` AND (s.work_permit_valid = false OR s.work_permit_expiry <= CURRENT_DATE)`;
-  }
-
-  sql += ` ORDER BY u.last_name, u.first_name`;
-
-  const result = await query(sql, params);
-  return res.json(result.rows);
+  return res.json({
+    data: dataResult.rows,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+  });
 }));
 
 // GET /api/substitutes/available - available for a specific date

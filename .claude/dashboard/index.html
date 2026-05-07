@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Machliphon · Agent Dashboard</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0a0f1e;--surface:#111827;--surface2:#1a2235;--border:#1e2d45;
+    --text:#e2e8f0;--muted:#64748b;--accent:#38bdf8;
+    --green:#4ade80;--amber:#fbbf24;--red:#f87171;--purple:#a78bfa;
+    --idle-c:#64748b;--working-c:#38bdf8;--done-c:#4ade80;--error-c:#f87171;
+  }
+  body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;min-height:100vh;direction:ltr}
+  /* HEADER */
+  header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+  .logo{display:flex;align-items:center;gap:10px}
+  .logo-icon{width:32px;height:32px;background:linear-gradient(135deg,#0ea5e9,#6366f1);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px}
+  .logo-title{font-size:16px;font-weight:700;letter-spacing:-.3px}
+  .logo-sub{font-size:11px;color:var(--muted);margin-top:1px}
+  .header-right{display:flex;align-items:center;gap:16px}
+  .live-badge{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--green);font-weight:600}
+  .live-dot{width:8px;height:8px;background:var(--green);border-radius:50%;animation:pulse 1.4s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.85)}}
+  .clock{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+  /* LAYOUT */
+  .grid{display:grid;grid-template-columns:320px 1fr 320px;gap:0;height:calc(100vh - 57px)}
+  .panel{overflow-y:auto;border-right:1px solid var(--border);padding:16px}
+  .panel:last-child{border-right:none}
+  .panel-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+  .count-badge{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1px 7px;font-size:11px;color:var(--muted)}
+  /* AGENT CARDS */
+  .agent-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;transition:border-color .2s}
+  .agent-card.working{border-color:var(--accent)}
+  .agent-card.done{border-color:var(--green)}
+  .agent-card.error{border-color:var(--red)}
+  .agent-top{display:flex;align-items:center;gap:10px}
+  .status-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;transition:background .3s}
+  .status-dot.idle{background:var(--idle-c)}
+  .status-dot.working{background:var(--working-c);animation:pulse 1s infinite}
+  .status-dot.reviewing{background:var(--amber);animation:pulse 1.2s infinite}
+  .status-dot.done{background:var(--done-c)}
+  .status-dot.error{background:var(--error-c)}
+  .agent-name{font-size:13px;font-weight:600;flex:1}
+  .status-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;padding:2px 7px;border-radius:5px}
+  .status-label.idle{background:#1e293b;color:var(--muted)}
+  .status-label.working{background:#0c2744;color:var(--accent)}
+  .status-label.reviewing{background:#2d1f00;color:var(--amber)}
+  .status-label.done{background:#052e16;color:var(--green)}
+  .status-label.error{background:#2d0a0a;color:var(--red)}
+  .agent-task{font-size:11px;color:var(--muted);margin-top:7px;line-height:1.5;min-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .agent-task.active{color:var(--text)}
+  .agent-time{font-size:10px;color:var(--muted);margin-top:4px}
+  .progress-bar{height:3px;background:var(--surface2);border-radius:2px;margin-top:8px;overflow:hidden}
+  .progress-fill{height:100%;background:linear-gradient(90deg,#0ea5e9,#6366f1);border-radius:2px;transition:width .5s ease}
+  /* TASKS */
+  .tabs{display:flex;gap:4px;margin-bottom:14px;background:var(--surface2);padding:3px;border-radius:8px}
+  .tab{flex:1;padding:6px;text-align:center;font-size:11px;font-weight:600;border-radius:6px;cursor:pointer;color:var(--muted);transition:all .15s}
+  .tab.active{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.4)}
+  .task-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:11px 13px;margin-bottom:8px;cursor:default;transition:border-color .2s}
+  .task-card:hover{border-color:var(--accent)}
+  .task-header{display:flex;align-items:flex-start;gap:8px}
+  .task-priority{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:5px}
+  .priority-high{background:var(--red)}
+  .priority-medium{background:var(--amber)}
+  .priority-low{background:var(--green)}
+  .task-title{font-size:12px;font-weight:600;flex:1;line-height:1.4}
+  .task-meta{display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap}
+  .task-agent{font-size:10px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:1px 7px;color:var(--accent)}
+  .task-time{font-size:10px;color:var(--muted)}
+  .task-desc{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.5}
+  .empty-state{text-align:center;color:var(--muted);font-size:12px;padding:40px 0}
+  /* ACTIVITY LOG */
+  .log-entry{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+  .log-entry:last-child{border-bottom:none}
+  .log-icon{width:28px;height:28px;border-radius:7px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px}
+  .log-icon.status{background:#0c2744}
+  .log-icon.task_added{background:#052e16}
+  .log-icon.task_in-progress{background:#0c2744}
+  .log-icon.task_done{background:#052e16}
+  .log-icon.task_failed{background:#2d0a0a}
+  .log-icon.default{background:var(--surface2)}
+  .log-body{flex:1;min-width:0}
+  .log-line{font-size:11px;line-height:1.4}
+  .log-agent{font-weight:700;color:var(--accent)}
+  .log-ts{font-size:10px;color:var(--muted);margin-top:2px}
+  /* STATS BAR */
+  .stats-bar{display:flex;gap:0;background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px}
+  .stat{padding:10px 20px;border-right:1px solid var(--border);font-size:11px;text-align:center}
+  .stat:last-child{border-right:none}
+  .stat-val{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.2}
+  .stat-val.accent{color:var(--accent)}
+  .stat-val.green{color:var(--green)}
+  .stat-val.amber{color:var(--amber)}
+  .stat-label{color:var(--muted);margin-top:1px}
+  /* Scrollbar */
+  ::-webkit-scrollbar{width:5px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    <div>
+      <div class="logo-title">Machliphon Agent Dashboard</div>
+      <div class="logo-sub">מחליפון · Real-time Multi-Agent Monitor</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+    <div class="clock" id="clock"></div>
+  </div>
+</header>
+
+<div class="stats-bar" id="stats-bar">
+  <div class="stat"><div class="stat-val accent" id="s-working">0</div><div class="stat-label">Working</div></div>
+  <div class="stat"><div class="stat-val green" id="s-done">0</div><div class="stat-label">Tasks Done</div></div>
+  <div class="stat"><div class="stat-val amber" id="s-pending">0</div><div class="stat-label">Queued</div></div>
+  <div class="stat"><div class="stat-val" id="s-agents">0</div><div class="stat-label">Agents</div></div>
+</div>
+
+<div class="grid">
+  <!-- LEFT: AGENTS -->
+  <div class="panel">
+    <div class="panel-title">Agents <span class="count-badge" id="agent-count">0</span></div>
+    <div id="agents-list"></div>
+  </div>
+
+  <!-- CENTER: TASKS -->
+  <div class="panel" style="border-right:1px solid var(--border)">
+    <div class="panel-title">Task Queue <span class="count-badge" id="task-count">0</span></div>
+    <div class="tabs">
+      <div class="tab active" onclick="setTab('pending')">Pending</div>
+      <div class="tab" onclick="setTab('in-progress')">In Progress</div>
+      <div class="tab" onclick="setTab('done')">Done</div>
+    </div>
+    <div id="tasks-list"></div>
+  </div>
+
+  <!-- RIGHT: ACTIVITY -->
+  <div class="panel">
+    <div class="panel-title">Activity Log <span class="count-badge" id="log-count">0</span></div>
+    <div id="activity-log"></div>
+  </div>
+</div>
+
+<script>
+const POLL_MS = 1500;
+let currentTab = 'pending';
+let lastStatus = {};
+let lastTasks  = [];
+let lastLog    = [];
+
+const AGENT_ICONS = {
+  'team-lead':'🎯','feature-planner':'📋','backend-developer':'⚙️',
+  'react-specialist':'⚛️','sql-pro':'🗄️','api-designer':'🔌',
+  'typescript-pro':'📘','security-engineer':'🔒','code-reviewer':'🔍',
+  'deployment-engineer':'🚀','debugger':'🐛','qa-expert':'✅','system':'🤖'
+};
+const LOG_ICONS = {
+  'status':'💬','task_added':'➕','task_in-progress':'🔄',
+  'task_done':'✅','task_failed':'❌'
+};
+const PRIORITY_LABELS = { high:'priority-high', medium:'priority-medium', low:'priority-low' };
+
+function setTab(t) {
+  currentTab = t;
+  document.querySelectorAll('.tab').forEach((el,i) => {
+    el.classList.toggle('active', ['pending','in-progress','done'][i] === t);
+  });
+  renderTasks();
+}
+
+function timeAgo(iso) {
+  if (!iso) return '';
+  const diff = Date.now() - new Date(iso).getTime();
+  const s = Math.floor(diff/1000);
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s/60)}m ago`;
+  return `${Math.floor(s/3600)}h ago`;
+}
+
+function renderAgents() {
+  const el = document.getElementById('agents-list');
+  const agents = Object.entries(lastStatus);
+  document.getElementById('agent-count').textContent = agents.length;
+  document.getElementById('s-agents').textContent = agents.length;
+  const working = agents.filter(([,v]) => v.status === 'working' || v.status === 'reviewing').length;
+  document.getElementById('s-working').textContent = working;
+
+  if (!agents.length) {
+    el.innerHTML = '<div class="empty-state">No agents registered yet</div>';
+    return;
+  }
+  el.innerHTML = agents.map(([name, data]) => {
+    const st = data.status || 'idle';
+    const icon = AGENT_ICONS[name] || '🤖';
+    const task = data.task || '—';
+    const progress = data.progress || 0;
+    const showProgress = st === 'working' || st === 'reviewing';
+    return `
+    <div class="agent-card ${st}">
+      <div class="agent-top">
+        <div class="status-dot ${st}"></div>
+        <div class="agent-name">${icon} ${name}</div>
+        <div class="status-label ${st}">${st}</div>
+      </div>
+      <div class="agent-task ${st !== 'idle' ? 'active' : ''}" title="${task}">${task}</div>
+      ${data.updatedAt ? `<div class="agent-time">${timeAgo(data.updatedAt)}</div>` : ''}
+      ${showProgress ? `<div class="progress-bar"><div class="progress-fill" style="width:${progress}%"></div></div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function renderTasks() {
+  const el = document.getElementById('tasks-list');
+  const filtered = lastTasks.filter(t => {
+    if (currentTab === 'done') return t.status === 'done' || t.status === 'failed';
+    return t.status === currentTab;
+  });
+  document.getElementById('task-count').textContent = lastTasks.length;
+
+  const doneCount = lastTasks.filter(t => t.status === 'done').length;
+  const pendingCount = lastTasks.filter(t => t.status === 'pending').length;
+  document.getElementById('s-done').textContent = doneCount;
+  document.getElementById('s-pending').textContent = pendingCount;
+
+  if (!filtered.length) {
+    el.innerHTML = `<div class="empty-state">No ${currentTab} tasks</div>`;
+    return;
+  }
+  el.innerHTML = filtered.map(t => {
+    const pClass = PRIORITY_LABELS[t.priority] || 'priority-low';
+    const ago = timeAgo(t.updatedAt || t.createdAt);
+    return `
+    <div class="task-card">
+      <div class="task-header">
+        <div class="task-priority ${pClass}"></div>
+        <div class="task-title">${t.title}</div>
+      </div>
+      ${t.description ? `<div class="task-desc">${t.description}</div>` : ''}
+      <div class="task-meta">
+        ${t.assignedTo ? `<span class="task-agent">${AGENT_ICONS[t.assignedTo]||'🤖'} ${t.assignedTo}</span>` : ''}
+        ${ago ? `<span class="task-time">${ago}</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderLog() {
+  const el = document.getElementById('activity-log');
+  document.getElementById('log-count').textContent = lastLog.length;
+  if (!lastLog.length) { el.innerHTML = '<div class="empty-state">No activity yet</div>'; return; }
+
+  el.innerHTML = lastLog.slice(0, 60).map(entry => {
+    const icon = LOG_ICONS[entry.event] || '💬';
+    const agentIcon = AGENT_ICONS[entry.agent] || '🤖';
+    let msg = '';
+    if (entry.event === 'status') msg = `→ ${entry.status || ''}${entry.task ? ': ' + entry.task : ''}`;
+    else if (entry.event === 'task_added') msg = `New task: <em>${entry.title}</em>`;
+    else if (entry.event === 'task_done') msg = `Completed: <em>${entry.title}</em>`;
+    else if (entry.event === 'task_in-progress') msg = `Started: <em>${entry.title}</em>`;
+    else msg = entry.task || entry.title || entry.event;
+
+    return `
+    <div class="log-entry">
+      <div class="log-icon ${entry.event || 'default'}">${icon}</div>
+      <div class="log-body">
+        <div class="log-line"><span class="log-agent">${agentIcon} ${entry.agent}</span> ${msg}</div>
+        <div class="log-ts">${entry.ts ? new Date(entry.ts).toLocaleTimeString() : ''}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function fetchAll() {
+  try {
+    const [s, t, l] = await Promise.all([
+      fetch('/api/status').then(r => r.json()),
+      fetch('/api/tasks').then(r => r.json()),
+      fetch('/api/log').then(r => r.json()),
+    ]);
+    lastStatus = s;
+    lastTasks  = t;
+    lastLog    = l;
+    renderAgents();
+    renderTasks();
+    renderLog();
+  } catch(e) {
+    // server not ready yet
+  }
+}
+
+// Clock
+function tick() {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-GB');
+}
+tick();
+setInterval(tick, 1000);
+
+// Poll
+fetchAll();
+setInterval(fetchAll, POLL_MS);
+</script>
+</body>
+</html>
