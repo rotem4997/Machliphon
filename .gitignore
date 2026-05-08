@@ -36,3 +36,4 @@ uploads/
 
 # Railway / Vercel
 .vercel/
+.claude/worktrees/
