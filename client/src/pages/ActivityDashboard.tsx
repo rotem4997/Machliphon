@@ -5,9 +5,8 @@ import {
   User, ArrowLeftRight, Zap, MapPin,
 } from 'lucide-react';
 import api from '@/utils/api';
-import { formatDistanceToNow, parseISO, format, addDays } from 'date-fns';
+import { formatDistanceToNow, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
-import { isHoliday } from '@/utils/holidays';
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -32,101 +31,6 @@ interface LiveStats {
   availableSubstitutes: number;
   lastActivity: string | null;
 }
-
-// ─── Mock data ──────────────────────────────────────────────
-
-const MOCK_KINDERGARTENS = [
-  'גן חבצלת', 'גן נרקיס', 'גן רקפת', 'גן כלנית', 'גן דליה',
-];
-
-const MOCK_SUBS = [
-  'מרים אברהם', 'רחל לוי', 'שרה כהן', 'לאה דוד',
-];
-
-function generateMockFeed(): ActivityEvent[] {
-  const events: ActivityEvent[] = [];
-  const now = new Date();
-
-  // Generate recent assignment events
-  const actions: { status: string; verb: string }[] = [
-    { status: 'pending', verb: 'שובצה' },
-    { status: 'confirmed', verb: 'אישרה' },
-    { status: 'arrived', verb: 'הגיעה' },
-    { status: 'completed', verb: 'הושלם' },
-  ];
-
-  for (let i = 0; i < 15; i++) {
-    const minutesAgo = i * 12 + Math.floor(Math.random() * 10);
-    const eventTime = new Date(now.getTime() - minutesAgo * 60_000);
-    const action = actions[i % actions.length];
-    const sub = MOCK_SUBS[i % MOCK_SUBS.length];
-    const kg = MOCK_KINDERGARTENS[i % MOCK_KINDERGARTENS.length];
-
-    events.push({
-      event_type: 'assignment',
-      id: `mock-event-${i}`,
-      status: action.status,
-      event_time: eventTime.toISOString(),
-      details: {
-        kindergarten: kg,
-        substitute: sub,
-        date: format(now, 'yyyy-MM-dd'),
-        assignedBy: 'מנהלת',
-      },
-    });
-  }
-
-  // Add some absence events
-  for (let i = 0; i < 3; i++) {
-    const minutesAgo = (i + 5) * 20;
-    const eventTime = new Date(now.getTime() - minutesAgo * 60_000);
-    events.push({
-      event_type: 'absence',
-      id: `mock-absence-${i}`,
-      status: i === 0 ? 'open' : 'assigned',
-      event_time: eventTime.toISOString(),
-      details: {
-        kindergarten: MOCK_KINDERGARTENS[(i + 2) % MOCK_KINDERGARTENS.length],
-        employee: ['דנה שמעוני', 'יעל פרידמן', 'נועה ברק'][i],
-        date: format(now, 'yyyy-MM-dd'),
-        reason: ['sick', 'vacation', 'personal'][i],
-      },
-    });
-  }
-
-  // Add system/hole events
-  const today = new Date();
-  for (let dayOff = 0; dayOff <= 2; dayOff++) {
-    const date = addDays(today, dayOff);
-    const dateStr = format(date, 'yyyy-MM-dd');
-    if (date.getDay() === 6 || isHoliday(dateStr)) continue;
-    // Check for holes (using same logic as dashboard mock)
-    const holesCount = dayOff === 0 ? 2 : dayOff === 1 ? 1 : 3;
-    if (holesCount > 0) {
-      events.push({
-        event_type: 'system',
-        id: `mock-hole-${dayOff}`,
-        status: 'holes',
-        event_time: new Date(now.getTime() - dayOff * 3600_000).toISOString(),
-        details: {
-          kindergarten: `${holesCount} גנים`,
-          date: dateStr,
-        },
-      });
-    }
-  }
-
-  return events.sort((a, b) => new Date(b.event_time).getTime() - new Date(a.event_time).getTime());
-}
-
-const MOCK_FEED = generateMockFeed();
-
-const MOCK_LIVE_STATS: LiveStats = {
-  assignmentsToday: { pending: 2, confirmed: 3, arrived: 1, completed: 1 },
-  absencesToday: { open: 1, assigned: 2 },
-  availableSubstitutes: 2,
-  lastActivity: new Date().toISOString(),
-};
 
 const REFETCH_INTERVAL = 300_000; // 5 minutes
 
