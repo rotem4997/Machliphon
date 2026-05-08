@@ -6,6 +6,7 @@ import { query } from '../db/pool';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { ValidationError, AuthenticationError } from '../errors/AppError';
+import { sendEmail } from '../utils/mailer';
 
 const router = Router();
 
@@ -176,10 +177,36 @@ router.post('/forgot-password', asyncHandler(async (req: Request, res: Response)
   const secret = process.env.JWT_SECRET!;
   const resetToken = jwt.sign({ userId: userResult.rows[0].id, type: 'password_reset' }, secret, { expiresIn: '1h' });
 
-  // In production: send email via nodemailer. For MVP, return token directly.
-  // TODO: integrate nodemailer for production
+  const { first_name } = userResult.rows[0];
+  const resetLink = `${process.env.CLIENT_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
+
+  // Send password-reset email (non-blocking — failure must not reveal whether email exists)
+  try {
+    await sendEmail({
+      to: email.toLowerCase(),
+      subject: 'איפוס סיסמה — מחליפון',
+      html: `
+        <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px;">
+          <h2 style="color: #1e3a5f;">שלום ${first_name},</h2>
+          <p>קיבלנו בקשה לאיפוס הסיסמה שלך במערכת מחליפון.</p>
+          <p>לאיפוס הסיסמה, לחצי על הקישור הבא (תקף לשעה אחת):</p>
+          <p>
+            <a href="${resetLink}" style="color: #1e3a5f; font-weight: bold;">
+              ${resetLink}
+            </a>
+          </p>
+          <p>אם לא ביקשת לאפס את הסיסמה, ניתן להתעלם מהודעה זו.</p>
+          <hr />
+          <p style="color: #888; font-size: 12px;">מחליפון — ניהול חכם של מחליפות בגני ילדים</p>
+        </div>
+      `,
+    });
+  } catch {
+    // email failure is non-fatal — response is always generic to prevent user enumeration
+  }
+
   return res.json({
-    message: 'קישור לאיפוס סיסמה נוצר. בסביבת פיתוח הטוקן מוחזר ישירות.',
+    message: 'אם כתובת האימייל קיימת במערכת, קישור לאיפוס סיסמה ישלח בקרוב.',
     resetToken: process.env.NODE_ENV !== 'production' ? resetToken : undefined,
   });
 }));

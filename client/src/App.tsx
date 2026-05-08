@@ -21,6 +21,7 @@ import ManagerKindergartensPage from './pages/ManagerKindergartensPage';
 import SubstituteHistoryPage from './pages/SubstituteHistoryPage';
 import KindergartenDetailPage from './pages/KindergartenDetailPage';
 import MLInsightsPage from './pages/MLInsightsPage';
+import SettingsPage from './pages/SettingsPage';
 import AgentDashboard from './pages/AgentDashboard';
 import { useAuthStore } from './context/authStore';
 
@@ -91,7 +92,7 @@ export default function App() {
                 <Route index element={<MLInsightsPage />} />
               </Route>
               <Route path="/reports" element={<ReportsPage />} />
-              <Route path="/settings" element={<div className="text-slate-400 text-center py-20">בפיתוח...</div>} />
+              <Route path="/settings" element={<SettingsPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/availability" element={<AvailabilityPage />} />
             </Route>

@@ -3,6 +3,7 @@ import { query } from '../db/pool';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { ValidationError, NotFoundError, ConflictError } from '../errors/AppError';
+import { sendEmail } from '../utils/mailer';
 
 // D2: Israeli public holidays (fixed dates, format MM-DD)
 const IL_HOLIDAYS: Record<string, string> = {
@@ -117,6 +118,32 @@ router.post('/', requireRole('manager', 'authority_admin', 'super_admin'), async
     `שובצת לגן ${kgName.rows[0].name} בתאריך ${assignmentDate}`,
     JSON.stringify({ assignmentId: result.rows[0].id, kindergartenId, date: assignmentDate })
   ]);
+  // Send email to substitute (non-blocking — don't fail assignment creation if email fails)
+  try {
+    const subEmailResult = await query(
+      'SELECT email, first_name FROM users WHERE id = $1',
+      [subUser.rows[0].user_id]
+    );
+    if (subEmailResult.rows[0]?.email) {
+      const { email, first_name } = subEmailResult.rows[0];
+      await sendEmail({
+        to: email,
+        subject: 'שיבוץ חדש — מחליפון',
+        html: `
+          <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px;">
+            <h2 style="color: #1e3a5f;">שלום ${first_name},</h2>
+            <p>שובצת לגן <strong>${kgName.rows[0].name}</strong> בתאריך <strong>${assignmentDate}</strong>.</p>
+            <p>שעות: ${startTime || '07:30'} — ${endTime || '14:00'}</p>
+            <p>להאשרה, בקרי במערכת מחליפון.</p>
+            <hr />
+            <p style="color: #888; font-size: 12px;">מחליפון — ניהול חכם של מחליפות בגני ילדים</p>
+          </div>
+        `,
+      });
+    }
+  } catch {
+    // email failure is non-fatal
+  }
   return res.status(201).json(result.rows[0]);
 }));
 
