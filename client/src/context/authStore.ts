@@ -73,24 +73,10 @@ export const useAuthStore = create<AuthState>()(
       isDemoMode: false,
 
       loginDemo: async (role) => {
-        const creds: Record<string, { email: string; password: string }> = {
-          authority_admin: { email: 'director@yokneam.muni.il', password: 'Demo1234!' },
-          manager:         { email: 'manager@yokneam.muni.il',  password: 'Demo1234!' },
-          substitute:      { email: 'miriam@example.com',        password: 'Demo1234!' },
-        };
         set({ isLoading: true });
-        try {
-          // 3-second timeout: if the real API doesn't respond quickly, fall straight to demo mode
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 3000);
-          const { data } = await api.post('/auth/login', creds[role], { signal: controller.signal });
-          clearTimeout(timer);
-          set({ user: data.user, token: data.token, refreshToken: data.refreshToken, isLoading: false, isDemoMode: false });
-        } catch {
-          // API unreachable, slow, or returned an error — fall back to offline demo profile
-          const fakeToken = `demo-token-${role}-${Date.now()}`;
-          set({ user: DEMO_PROFILES[role], token: fakeToken, refreshToken: null, isLoading: false, isDemoMode: true });
-        }
+        // Go straight to offline demo — no API round-trip, works without any backend
+        const fakeToken = `demo-token-${role}-${Date.now()}`;
+        set({ user: DEMO_PROFILES[role], token: fakeToken, refreshToken: null, isLoading: false, isDemoMode: true });
       },
 
       login: async (email, password) => {
