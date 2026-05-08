@@ -22,6 +22,7 @@ import SubstituteHistoryPage from './pages/SubstituteHistoryPage';
 import KindergartenDetailPage from './pages/KindergartenDetailPage';
 import MLInsightsPage from './pages/MLInsightsPage';
 import SettingsPage from './pages/SettingsPage';
+import LandingPage from './pages/LandingPage';
 import AgentDashboard from './pages/AgentDashboard';
 import { useAuthStore } from './context/authStore';
 
@@ -59,6 +60,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           {/* Public */}
+          <Route path="/landing" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
