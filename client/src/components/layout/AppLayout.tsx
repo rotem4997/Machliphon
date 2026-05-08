@@ -47,7 +47,7 @@ const navItems: Record<UserRole, { href: string; label: string; icon: React.Reac
 };
 
 export default function AppLayout() {
-  const { user, logout } = useAuthStore();
+  const { user, logout, isDemoMode } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -63,7 +63,6 @@ export default function AppLayout() {
   }, []);
 
   if (!user) return null;
-  const { isDemoMode } = useAuthStore();
   const links = navItems[user.role] || navItems.manager;
 
   const Sidebar = () => (
