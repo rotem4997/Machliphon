@@ -19,6 +19,8 @@ import AvailabilityPage from './pages/AvailabilityPage';
 import KnownAbsencesPage from './pages/KnownAbsencesPage';
 import ManagerKindergartensPage from './pages/ManagerKindergartensPage';
 import MLInsightsPage from './pages/MLInsightsPage';
+import MadganetExportPage from './pages/MadganetExportPage';
+import NotificationsPage from './pages/NotificationsPage';
 import { useAuthStore } from './context/authStore';
 
 // Clear any stale demo tokens left over from previous sessions.
@@ -86,6 +88,12 @@ export default function App() {
                 <Route index element={<MLInsightsPage />} />
               </Route>
               <Route path="/reports" element={<ReportsPage />} />
+              <Route path="/madganet" element={
+                <ProtectedRoute allowedRoles={['authority_admin', 'manager', 'super_admin']} />
+              }>
+                <Route index element={<MadganetExportPage />} />
+              </Route>
+              <Route path="/notifications" element={<NotificationsPage />} />
               <Route path="/settings" element={<div className="text-slate-400 text-center py-20">בפיתוח...</div>} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/availability" element={<AvailabilityPage />} />

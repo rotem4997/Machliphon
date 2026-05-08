@@ -59,6 +59,42 @@ router.post('/login', asyncHandler(async (req: Request, res: Response) => {
 
   await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
 
+  // Fire-and-forget: create permit-expiry notifications for authority admins/managers.
+  // Runs after response is sent — never blocks login.
+  if (user.authority_id && (user.role === 'authority_admin' || user.role === 'manager')) {
+    setImmediate(async () => {
+      try {
+        const expiring = await query(`
+          SELECT s.id, u2.first_name, u2.last_name, s.work_permit_expiry
+          FROM substitutes s
+          JOIN users u2 ON s.user_id = u2.id
+          WHERE s.authority_id = $1
+            AND s.status = 'active'
+            AND s.work_permit_expiry BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'
+        `, [user.authority_id]);
+
+        for (const sub of expiring.rows) {
+          const expDate = new Date(sub.work_permit_expiry);
+          const formatted = `${expDate.getDate().toString().padStart(2, '0')}/${(expDate.getMonth() + 1).toString().padStart(2, '0')}/${expDate.getFullYear()}`;
+          const message = `תיק עובד של ${sub.first_name} ${sub.last_name} פג תוקפו ב-${formatted}`;
+          // Only insert if no identical unread notification exists (prevent flood on repeated logins)
+          await query(`
+            INSERT INTO notifications (user_id, type, title, message, data)
+            SELECT $1, 'permit_expiring', 'תיק עובד פג תוקף', $2, $3
+            WHERE NOT EXISTS (
+              SELECT 1 FROM notifications
+              WHERE user_id = $1 AND type = 'permit_expiring'
+                AND is_read = false
+                AND data->>'substituteId' = $4
+            )
+          `, [user.id, message, JSON.stringify({ substituteId: sub.id }), sub.id]);
+        }
+      } catch {
+        // Non-critical — swallow silently
+      }
+    });
+  }
+
   let profile = null;
   if (user.role === 'substitute') {
     const sub = await query('SELECT * FROM substitutes WHERE user_id = $1', [user.id]);

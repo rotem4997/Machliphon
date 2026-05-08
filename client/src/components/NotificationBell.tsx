@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Bell, X, Check, CheckCheck } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import api from '@/utils/api';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -119,7 +120,7 @@ export default function NotificationBell() {
           </div>
 
           {/* List */}
-          <div className="max-h-80 overflow-y-auto">
+          <div className="max-h-72 overflow-y-auto">
             {!notifications || notifications.length === 0 ? (
               <div className="py-10 text-center">
                 <Bell size={24} className="text-slate-300 mx-auto mb-2" />
@@ -157,6 +158,16 @@ export default function NotificationBell() {
                 </div>
               ))
             )}
+          </div>
+          {/* Footer link */}
+          <div className="border-t border-slate-100 px-4 py-2.5">
+            <Link
+              to="/notifications"
+              onClick={() => setOpen(false)}
+              className="text-xs text-sky-600 hover:text-sky-700 font-medium"
+            >
+              כל ההתראות ←
+            </Link>
           </div>
         </div>
       )}
