@@ -6,6 +6,9 @@ import {
 } from 'lucide-react';
 import api, { handleApiError } from '@/utils/api';
 import { useAuthStore } from '@/context/authStore';
+import {
+  DEMO_ASSIGNMENTS, DEMO_AVAILABILITY, DEMO_SUB_PROFILE,
+} from '@/utils/demoData';
 import toast from 'react-hot-toast';
 import { format, parseISO, startOfWeek, addDays, addWeeks, addMonths, subWeeks, subMonths, isSameDay, isSameMonth } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -47,10 +50,13 @@ export default function SubstituteDashboard() {
     photo_url: '',
   });
 
+  const { isDemoMode } = useAuthStore();
+
   // ─── Queries ──────────────────────────────────────────────
   const { data: profile } = useQuery({
     queryKey: ['my-profile'],
-    queryFn: () => api.get('/substitutes/me').then(r => r.data),
+    queryFn: () => api.get('/substitutes/me').then(r => r.data)
+      .catch(() => isDemoMode ? DEMO_SUB_PROFILE : null),
   });
 
   // Multi-month assignment queries for the calendar
@@ -61,21 +67,25 @@ export default function SubstituteDashboard() {
 
   const { data: assignments } = useQuery<Assignment[]>({
     queryKey: ['sub-assignments', visibleYear, visibleMonth],
-    queryFn: () => api.get('/assignments', { params: { month: visibleMonth, year: visibleYear } }).then(r => r.data),
+    queryFn: () => api.get('/assignments', { params: { month: visibleMonth, year: visibleYear } }).then(r => r.data)
+      .catch(() => isDemoMode ? DEMO_ASSIGNMENTS as Assignment[] : []),
   });
   const { data: prevMonthAssignments } = useQuery<Assignment[]>({
     queryKey: ['sub-assignments', prevDate.getFullYear(), prevDate.getMonth() + 1],
-    queryFn: () => api.get('/assignments', { params: { month: prevDate.getMonth() + 1, year: prevDate.getFullYear() } }).then(r => r.data),
+    queryFn: () => api.get('/assignments', { params: { month: prevDate.getMonth() + 1, year: prevDate.getFullYear() } }).then(r => r.data)
+      .catch(() => []),
   });
   const { data: nextMonthAssignments } = useQuery<Assignment[]>({
     queryKey: ['sub-assignments', nextDate.getFullYear(), nextDate.getMonth() + 1],
-    queryFn: () => api.get('/assignments', { params: { month: nextDate.getMonth() + 1, year: nextDate.getFullYear() } }).then(r => r.data),
+    queryFn: () => api.get('/assignments', { params: { month: nextDate.getMonth() + 1, year: nextDate.getFullYear() } }).then(r => r.data)
+      .catch(() => []),
   });
 
   // Unavailability records for the current month
   const { data: availabilityRecords = [] } = useQuery<{ date: string; is_available: boolean }[]>({
     queryKey: ['sub-availability', visibleYear, visibleMonth],
-    queryFn: () => api.get('/substitutes/availability', { params: { month: visibleMonth, year: visibleYear } }).then(r => r.data),
+    queryFn: () => api.get('/substitutes/availability', { params: { month: visibleMonth, year: visibleYear } }).then(r => r.data)
+      .catch(() => isDemoMode ? DEMO_AVAILABILITY : []),
   });
 
   // Sync profile form when real profile data or auth user loads

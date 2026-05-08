@@ -21,6 +21,7 @@ interface AuthState {
   token: string | null;
   refreshToken: string | null;
   isLoading: boolean;
+  isDemoMode: boolean;
 
   login: (email: string, password: string) => Promise<void>;
   loginDemo: (role: 'authority_admin' | 'manager' | 'substitute') => Promise<void>;
@@ -29,6 +30,39 @@ interface AuthState {
   updateUser: (updates: Partial<User>) => void;
 }
 
+const DEMO_PROFILES: Record<string, User> = {
+  authority_admin: {
+    id: 'demo-director-1',
+    email: 'director@yokneam.muni.il',
+    role: 'authority_admin',
+    firstName: 'ירון',
+    lastName: 'כהן',
+    phone: '04-9590000',
+    authorityId: 'auth-yokneam-1',
+    authorityName: 'עיריית יקנעם עילית',
+  },
+  manager: {
+    id: 'demo-manager-1',
+    email: 'manager@yokneam.muni.il',
+    role: 'manager',
+    firstName: 'שרה',
+    lastName: 'לוי',
+    phone: '052-1234567',
+    authorityId: 'auth-yokneam-1',
+    authorityName: 'עיריית יקנעם עילית',
+  },
+  substitute: {
+    id: 'demo-sub-1',
+    email: 'miriam@example.com',
+    role: 'substitute',
+    firstName: 'מרים',
+    lastName: 'אברהם',
+    phone: '054-1234567',
+    authorityId: 'auth-yokneam-1',
+    authorityName: 'עיריית יקנעם עילית',
+  },
+};
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -36,6 +70,7 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       refreshToken: null,
       isLoading: false,
+      isDemoMode: false,
 
       loginDemo: async (role) => {
         const creds: Record<string, { email: string; password: string }> = {
@@ -46,11 +81,11 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
         try {
           const { data } = await api.post('/auth/login', creds[role]);
-          set({ user: data.user, token: data.token, refreshToken: data.refreshToken, isLoading: false });
+          set({ user: data.user, token: data.token, refreshToken: data.refreshToken, isLoading: false, isDemoMode: false });
         } catch {
-          // DB not available — set a UI-only session (API calls will fail with 401)
-          set({ isLoading: false });
-          throw new Error('שרת הדמו אינו זמין. אנא נסה להיכנס עם אימייל וסיסמה.');
+          // API not reachable — fall back to offline demo profile
+          const fakeToken = `demo-token-${role}-${Date.now()}`;
+          set({ user: DEMO_PROFILES[role], token: fakeToken, refreshToken: null, isLoading: false, isDemoMode: true });
         }
       },
 
@@ -58,11 +93,12 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
         try {
           const { data } = await api.post('/auth/login', { email, password });
-          set({ 
-            user: data.user, 
-            token: data.token, 
+          set({
+            user: data.user,
+            token: data.token,
             refreshToken: data.refreshToken,
-            isLoading: false 
+            isLoading: false,
+            isDemoMode: false,
           });
           api.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
         } catch (error) {
@@ -72,7 +108,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => {
-        set({ user: null, token: null, refreshToken: null });
+        set({ user: null, token: null, refreshToken: null, isDemoMode: false });
         delete api.defaults.headers.common['Authorization'];
       },
 
@@ -95,9 +131,10 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'machliphon-auth',
       partialize: (state: AuthState) => ({
-        token: state.token,
-        refreshToken: state.refreshToken,
-        user: state.user,
+        token: state.token?.startsWith('demo-token-') ? null : state.token,
+        refreshToken: state.token?.startsWith('demo-token-') ? null : state.refreshToken,
+        user: state.token?.startsWith('demo-token-') ? null : state.user,
+        isDemoMode: false,
       }),
     }
   )

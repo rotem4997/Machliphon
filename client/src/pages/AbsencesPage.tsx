@@ -5,6 +5,8 @@ import {
   AlertTriangle, Clock, CheckCircle, Loader2,
 } from 'lucide-react';
 import api, { handleApiError } from '@/utils/api';
+import { useAuthStore } from '@/context/authStore';
+import { DEMO_ABSENCES, DEMO_KINDERGARTENS } from '@/utils/demoData';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -55,6 +57,7 @@ const statusConfig: Record<string, { label: string; cls: string; icon: typeof Ch
 // ─── Main Component ───────────────────────────────────────────
 export default function AbsencesPage() {
   const queryClient = useQueryClient();
+  const { isDemoMode } = useAuthStore();
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterReason, setFilterReason] = useState('');
@@ -62,7 +65,8 @@ export default function AbsencesPage() {
 
   const { data: absences = [], isLoading, isError } = useQuery<AbsenceReport[]>({
     queryKey: ['absences'],
-    queryFn: () => api.get('/absences').then(r => r.data),
+    queryFn: () => api.get('/absences').then(r => r.data)
+      .catch(() => isDemoMode ? DEMO_ABSENCES as AbsenceReport[] : []),
   });
 
   const deleteMutation = useMutation({
@@ -288,6 +292,7 @@ function CreateAbsenceModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
+  const { isDemoMode } = useAuthStore();
   const [kindergartenId, setKindergartenId] = useState('');
   const [employeeName, setEmployeeName] = useState('');
   const [employeeRole, setEmployeeRole] = useState<'teacher' | 'assistant'>('teacher');
@@ -297,7 +302,8 @@ function CreateAbsenceModal({
 
   const { data: kindergartens = [], isLoading: kgsLoading } = useQuery<Kindergarten[]>({
     queryKey: ['kindergartens'],
-    queryFn: () => api.get('/kindergartens').then(r => r.data),
+    queryFn: () => api.get('/kindergartens').then(r => r.data)
+      .catch(() => isDemoMode ? DEMO_KINDERGARTENS : []),
   });
 
   const createMutation = useMutation({

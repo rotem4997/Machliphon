@@ -5,6 +5,8 @@ import {
   User, ArrowLeftRight, Zap, MapPin,
 } from 'lucide-react';
 import api from '@/utils/api';
+import { useAuthStore } from '@/context/authStore';
+import { DEMO_ACTIVITY_FEED, DEMO_LIVE_STATS } from '@/utils/demoData';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
 
@@ -38,16 +40,19 @@ const REFETCH_INTERVAL = 300_000; // 5 minutes
 
 export default function ActivityDashboard() {
   const [filter, setFilter] = useState<'all' | 'assignments' | 'absences' | 'holes'>('all');
+  const { isDemoMode } = useAuthStore();
 
   const { data: liveStats } = useQuery<LiveStats>({
     queryKey: ['live-stats'],
-    queryFn: () => api.get('/activity/live-stats').then(r => r.data),
+    queryFn: () => api.get('/activity/live-stats').then(r => r.data)
+      .catch(() => isDemoMode ? DEMO_LIVE_STATS : null),
     refetchInterval: REFETCH_INTERVAL,
   });
 
   const { data: feed } = useQuery<ActivityEvent[]>({
     queryKey: ['activity-feed'],
-    queryFn: () => api.get('/activity/feed', { params: { limit: 30 } }).then(r => r.data),
+    queryFn: () => api.get('/activity/feed', { params: { limit: 30 } }).then(r => r.data)
+      .catch(() => isDemoMode ? DEMO_ACTIVITY_FEED as ActivityEvent[] : []),
     refetchInterval: REFETCH_INTERVAL,
   });
 

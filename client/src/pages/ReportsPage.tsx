@@ -4,6 +4,8 @@ import {
   BarChart3, FileText, Download, TrendingUp
 } from 'lucide-react';
 import api from '@/utils/api';
+import { useAuthStore } from '@/context/authStore';
+import { DEMO_ASSIGNMENTS, DEMO_NEIGHBORHOODS } from '@/utils/demoData';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -38,15 +40,18 @@ export default function ReportsPage() {
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
+  const { isDemoMode } = useAuthStore();
 
   const { data: assignmentsRaw } = useQuery<Assignment[]>({
     queryKey: ['report-assignments', month, year],
-    queryFn: () => api.get('/assignments', { params: { month, year } }).then(r => r.data).catch(() => []),
+    queryFn: () => api.get('/assignments', { params: { month, year } }).then(r => r.data)
+      .catch(() => isDemoMode ? DEMO_ASSIGNMENTS as Assignment[] : []),
   });
 
   const { data: neighborhoodsRaw } = useQuery<NeighborhoodCoverage[]>({
     queryKey: ['coverage-neighborhoods'],
-    queryFn: () => api.get('/dashboard/coverage-by-neighborhood').then(r => r.data).catch(() => []),
+    queryFn: () => api.get('/dashboard/coverage-by-neighborhood').then(r => r.data)
+      .catch(() => isDemoMode ? DEMO_NEIGHBORHOODS : []),
   });
 
   const assignments = assignmentsRaw ?? [];

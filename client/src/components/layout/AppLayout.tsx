@@ -63,6 +63,7 @@ export default function AppLayout() {
   }, []);
 
   if (!user) return null;
+  const { isDemoMode } = useAuthStore();
   const links = navItems[user.role] || navItems.manager;
 
   const Sidebar = () => (
@@ -161,6 +162,14 @@ export default function AppLayout() {
             )}
           </button>
         </header>
+
+        {/* Demo mode banner */}
+        {isDemoMode && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-center text-xs text-amber-700 font-medium flex items-center justify-center gap-2">
+            <span>⚠️</span>
+            מצב דמו — הנתונים המוצגים הם לדוגמה בלבד. לחיבור לנתונים אמיתיים נדרשת מסד נתונים.
+          </div>
+        )}
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto p-4 lg:p-8">

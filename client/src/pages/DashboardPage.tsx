@@ -5,6 +5,7 @@ import {
   Clock, User, LayoutGrid, List, CheckCircle, Phone, Sparkles,
 } from 'lucide-react';
 import api, { handleApiError } from '@/utils/api';
+import { useAuthStore } from '@/context/authStore';
 import toast from 'react-hot-toast';
 import {
   format, parseISO, startOfWeek, addDays, addWeeks, subWeeks,
@@ -12,6 +13,9 @@ import {
 } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { isHoliday } from '@/utils/holidays';
+import {
+  DEMO_KINDERGARTENS, DEMO_ABSENCES, DEMO_ASSIGNMENTS,
+} from '@/utils/demoData';
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -83,43 +87,49 @@ export default function DashboardPage() {
   const [currentDate, setCurrentDate] = useState(today);
   const [selectedDay, setSelectedDay] = useState<Date>(today);
   const [assignModal, setAssignModal] = useState<{ kindergartenId: string; date: string } | null>(null);
+  const { isDemoMode } = useAuthStore();
 
   // ─── Queries ───────────────────────────────────────────
   const { data: kindergartens } = useQuery<Kindergarten[]>({
     queryKey: ['kindergartens'],
-    queryFn: () => api.get('/kindergartens').then(r => r.data),
+    queryFn: () => api.get('/kindergartens').then(r => r.data)
+      .catch(() => isDemoMode ? DEMO_KINDERGARTENS : []),
   });
 
   const visibleMonth = currentDate.getMonth() + 1;
   const visibleYear = currentDate.getFullYear();
-  const { data: assignments } = useQuery<Assignment[]>({
-    queryKey: ['assignments', visibleYear, visibleMonth],
-    queryFn: () => api.get('/assignments', { params: { month: visibleMonth, year: visibleYear } }).then(r => r.data),
-  });
-
-  // Also fetch the previous and next month so the visible week never shows
-  // an empty calendar near month boundaries.
   const prev = subMonths(currentDate, 1);
   const next = addMonths(currentDate, 1);
+
+  const { data: assignments } = useQuery<Assignment[]>({
+    queryKey: ['assignments', visibleYear, visibleMonth],
+    queryFn: () => api.get('/assignments', { params: { month: visibleMonth, year: visibleYear } }).then(r => r.data)
+      .catch(() => isDemoMode ? DEMO_ASSIGNMENTS : []),
+  });
   const { data: prevMonthAssignments } = useQuery<Assignment[]>({
     queryKey: ['assignments', prev.getFullYear(), prev.getMonth() + 1],
-    queryFn: () => api.get('/assignments', { params: { month: prev.getMonth() + 1, year: prev.getFullYear() } }).then(r => r.data),
+    queryFn: () => api.get('/assignments', { params: { month: prev.getMonth() + 1, year: prev.getFullYear() } }).then(r => r.data)
+      .catch(() => []),
   });
   const { data: nextMonthAssignments } = useQuery<Assignment[]>({
     queryKey: ['assignments', next.getFullYear(), next.getMonth() + 1],
-    queryFn: () => api.get('/assignments', { params: { month: next.getMonth() + 1, year: next.getFullYear() } }).then(r => r.data),
+    queryFn: () => api.get('/assignments', { params: { month: next.getMonth() + 1, year: next.getFullYear() } }).then(r => r.data)
+      .catch(() => []),
   });
   const { data: absences } = useQuery<AbsenceReport[]>({
     queryKey: ['absences', visibleYear, visibleMonth],
-    queryFn: () => api.get('/absences', { params: { month: visibleMonth, year: visibleYear } }).then(r => r.data),
+    queryFn: () => api.get('/absences', { params: { month: visibleMonth, year: visibleYear } }).then(r => r.data)
+      .catch(() => isDemoMode ? DEMO_ABSENCES : []),
   });
   const { data: prevMonthAbsences } = useQuery<AbsenceReport[]>({
     queryKey: ['absences', prev.getFullYear(), prev.getMonth() + 1],
-    queryFn: () => api.get('/absences', { params: { month: prev.getMonth() + 1, year: prev.getFullYear() } }).then(r => r.data),
+    queryFn: () => api.get('/absences', { params: { month: prev.getMonth() + 1, year: prev.getFullYear() } }).then(r => r.data)
+      .catch(() => []),
   });
   const { data: nextMonthAbsences } = useQuery<AbsenceReport[]>({
     queryKey: ['absences', next.getFullYear(), next.getMonth() + 1],
-    queryFn: () => api.get('/absences', { params: { month: next.getMonth() + 1, year: next.getFullYear() } }).then(r => r.data),
+    queryFn: () => api.get('/absences', { params: { month: next.getMonth() + 1, year: next.getFullYear() } }).then(r => r.data)
+      .catch(() => []),
   });
 
   const kgs = useMemo(() => kindergartens ?? [], [kindergartens]);

@@ -123,7 +123,7 @@ export default function LoginPage() {
 
           {/* Demo accounts */}
           <div className="mt-6 pt-6 border-t border-slate-100">
-            <p className="text-xs text-slate-400 mb-3 text-center">כניסה מהירה לדמו (סיסמה: Demo1234!)</p>
+            <p className="text-xs text-slate-400 mb-3 text-center">כניסה מהירה לדמו — עובד גם ללא מסד נתונים</p>
             <div className="grid grid-cols-3 gap-2">
               {demoLogins.map(d => (
                 <button
