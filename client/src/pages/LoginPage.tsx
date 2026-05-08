@@ -4,6 +4,7 @@ import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../context/authStore';
 import Logo from '../components/Logo';
 import toast from 'react-hot-toast';
+import type { UserRole } from '../context/authStore';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -11,6 +12,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const { login, loginDemo, isLoading } = useAuthStore();
   const navigate = useNavigate();
+  const [demoLoading, setDemoLoading] = useState<UserRole | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,6 +32,19 @@ export default function LoginPage() {
     { label: 'מדריכה',    role: 'manager',          color: 'bg-sky-500'  },
     { label: 'מחליפה',    role: 'substitute',        color: 'bg-mint-500' },
   ];
+
+  const handleDemoLogin = async (role: 'authority_admin' | 'manager' | 'substitute') => {
+    setDemoLoading(role);
+    try {
+      await loginDemo(role);
+      navigate('/dashboard');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'שגיאה בכניסת דמו';
+      toast.error(msg);
+    } finally {
+      setDemoLoading(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-navy-900 via-navy-800 to-navy-700 flex items-center justify-center p-4">
@@ -113,9 +128,11 @@ export default function LoginPage() {
               {demoLogins.map(d => (
                 <button
                   key={d.role}
-                  onClick={() => { loginDemo(d.role); navigate('/dashboard'); }}
-                  className={`${d.color} text-white text-xs font-medium py-2 px-3 rounded-xl hover:opacity-90 transition-opacity`}
+                  onClick={() => handleDemoLogin(d.role)}
+                  disabled={!!demoLoading || isLoading}
+                  className={`${d.color} text-white text-xs font-medium py-2 px-3 rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-1 disabled:opacity-60`}
                 >
+                  {demoLoading === d.role && <Loader2 size={10} className="animate-spin" />}
                   {d.label}
                 </button>
               ))}

@@ -23,7 +23,7 @@ interface AuthState {
   isLoading: boolean;
 
   login: (email: string, password: string) => Promise<void>;
-  loginDemo: (role: 'authority_admin' | 'manager' | 'substitute') => void;
+  loginDemo: (role: 'authority_admin' | 'manager' | 'substitute') => Promise<void>;
   logout: () => void;
   refreshAuth: () => Promise<void>;
   updateUser: (updates: Partial<User>) => void;
@@ -37,40 +37,21 @@ export const useAuthStore = create<AuthState>()(
       refreshToken: null,
       isLoading: false,
 
-      loginDemo: (role) => {
-        const profiles: Record<string, User> = {
-          authority_admin: {
-            id: 'demo-director-1',
-            email: 'director@yokneam.muni.il',
-            role: 'authority_admin',
-            firstName: 'ירון',
-            lastName: 'כהן',
-            phone: '04-9590000',
-            authorityId: 'auth-yokneam-1',
-            authorityName: 'עיריית יקנעם עילית',
-          },
-          manager: {
-            id: 'demo-manager-1',
-            email: 'manager@yokneam.muni.il',
-            role: 'manager',
-            firstName: 'שרה',
-            lastName: 'לוי',
-            phone: '052-1234567',
-            authorityId: 'auth-yokneam-1',
-            authorityName: 'עיריית יקנעם עילית',
-          },
-          substitute: {
-            id: 'demo-sub-1',
-            email: 'miriam@example.com',
-            role: 'substitute',
-            firstName: 'מרים',
-            lastName: 'אברהם',
-            phone: '054-1234567',
-            authorityId: 'auth-yokneam-1',
-            authorityName: 'עיריית יקנעם עילית',
-          },
+      loginDemo: async (role) => {
+        const creds: Record<string, { email: string; password: string }> = {
+          authority_admin: { email: 'director@yokneam.muni.il', password: 'Demo1234!' },
+          manager:         { email: 'manager@yokneam.muni.il',  password: 'Demo1234!' },
+          substitute:      { email: 'miriam@example.com',        password: 'Demo1234!' },
         };
-        set({ user: profiles[role], token: `demo-token-${role}-${Date.now()}`, refreshToken: null });
+        set({ isLoading: true });
+        try {
+          const { data } = await api.post('/auth/login', creds[role]);
+          set({ user: data.user, token: data.token, refreshToken: data.refreshToken, isLoading: false });
+        } catch {
+          // DB not available — set a UI-only session (API calls will fail with 401)
+          set({ isLoading: false });
+          throw new Error('שרת הדמו אינו זמין. אנא נסה להיכנס עם אימייל וסיסמה.');
+        }
       },
 
       login: async (email, password) => {
@@ -113,13 +94,11 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'machliphon-auth',
-      // Never persist demo sessions — they should last only for the browser session.
-      partialize: (state: AuthState) => {
-        if (state.token?.startsWith('demo-token-')) {
-          return { token: null, refreshToken: null, user: null };
-        }
-        return { token: state.token, refreshToken: state.refreshToken, user: state.user };
-      },
+      partialize: (state: AuthState) => ({
+        token: state.token,
+        refreshToken: state.refreshToken,
+        user: state.user,
+      }),
     }
   )
 );

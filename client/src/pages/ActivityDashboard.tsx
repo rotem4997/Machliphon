@@ -147,8 +147,8 @@ export default function ActivityDashboard() {
     refetchInterval: REFETCH_INTERVAL,
   });
 
-  const stats = liveStats || MOCK_LIVE_STATS;
-  const allEvents = feed && feed.length > 0 ? feed : MOCK_FEED;
+  const stats = liveStats ?? { assignmentsToday: {}, absencesToday: {}, availableSubstitutes: 0, lastActivity: null };
+  const allEvents = feed ?? [];
 
   const filteredEvents = useMemo(() => {
     if (filter === 'all') return allEvents;

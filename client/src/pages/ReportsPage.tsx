@@ -94,13 +94,8 @@ export default function ReportsPage() {
     queryFn: () => api.get('/dashboard/coverage-by-neighborhood').then(r => r.data).catch(() => []),
   });
 
-  const assignments = assignmentsRaw && assignmentsRaw.length > 0
-    ? assignmentsRaw
-    : buildMockReportAssignments(month, year);
-
-  const neighborhoods = neighborhoodsRaw && neighborhoodsRaw.length > 0
-    ? neighborhoodsRaw
-    : MOCK_NEIGHBORHOODS;
+  const assignments = assignmentsRaw ?? [];
+  const neighborhoods = neighborhoodsRaw ?? [];
 
   // Compute stats
   const totalAssignments = assignments?.length ?? 0;

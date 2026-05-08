@@ -226,10 +226,21 @@ export default function SubstituteDashboard() {
     }
   };
 
-  const saveProfile = () => {
-    setEditingProfile(false);
-    toast.success('הפרופיל עודכן בהצלחה');
-  };
+  const saveProfileMutation = useMutation({
+    mutationFn: () => api.patch('/auth/me', {
+      firstName: profileForm.first_name,
+      lastName: profileForm.last_name,
+      phone: profileForm.phone,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-profile'] });
+      setEditingProfile(false);
+      toast.success('הפרופיל עודכן בהצלחה');
+    },
+    onError: (err) => handleApiError(err, 'PATCH /auth/me'),
+  });
+
+  const saveProfile = () => saveProfileMutation.mutate();
 
   // ─── Week days for calendar ───────────────────────────────
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
