@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, X, Calendar, AlertCircle, Trash2 } from 'lucide-react';
 import api from '@/utils/api';
+import { useAuthStore } from '@/context/authStore';
+import { DEMO_KNOWN_ABSENCES, DEMO_KINDERGARTENS } from '@/utils/demoData';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -45,16 +47,17 @@ export default function KnownAbsencesPage() {
     startDate: '', endDate: '', reason: 'vacation', notes: '',
   });
   const queryClient = useQueryClient();
+  const { isDemoMode } = useAuthStore();
 
   const { data: knownAbsences = [], isLoading, isError } = useQuery<KnownAbsence[]>({
     queryKey: ['known-absences'],
-    queryFn: () => api.get('/known-absences').then(r => r.data),
+    queryFn: () => api.get('/known-absences').then(r => r.data).catch(() => isDemoMode ? DEMO_KNOWN_ABSENCES as KnownAbsence[] : []),
   });
 
   const { data: kindergartens = [] } = useQuery<Kindergarten[]>({
     queryKey: ['kindergartens-my'],
     queryFn: () => api.get('/manager-kindergartens/my').then(r => r.data).catch(() =>
-      api.get('/kindergartens').then(r => r.data)
+      api.get('/kindergartens').then(r => r.data).catch(() => isDemoMode ? DEMO_KINDERGARTENS as Kindergarten[] : [])
     ),
   });
 

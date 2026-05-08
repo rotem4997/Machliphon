@@ -54,9 +54,9 @@ export default function SubstituteHistoryPage() {
   const [page, setPage] = useState(1);
   const [filterStatus, setFilterStatus] = useState('');
 
-  const { data: sub, isLoading: subLoading } = useQuery<Substitute>({
+  const { data: sub, isLoading: subLoading } = useQuery<Substitute | null>({
     queryKey: ['substitute', id],
-    queryFn: () => api.get(`/substitutes/${id}`).then(r => r.data),
+    queryFn: () => api.get(`/substitutes/${id}`).then(r => r.data).catch(() => null),
     enabled: Boolean(id),
   });
 
@@ -69,7 +69,7 @@ export default function SubstituteHistoryPage() {
     queryFn: () => {
       const params = new URLSearchParams({ page: String(page), limit: '20' });
       if (filterStatus) params.set('status', filterStatus);
-      return api.get(`/substitutes/${id}/assignments?${params}`).then(r => r.data);
+      return api.get(`/substitutes/${id}/assignments?${params}`).then(r => r.data).catch(() => ({ data: [], total: 0, page: 1, limit: 20, totalPages: 0 }));
     },
     enabled: Boolean(id),
   });

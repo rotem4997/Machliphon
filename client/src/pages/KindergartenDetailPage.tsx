@@ -52,9 +52,9 @@ export default function KindergartenDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const { data: kg, isLoading, isError } = useQuery<KindergartenDetail>({
+  const { data: kg, isLoading, isError } = useQuery<KindergartenDetail | null>({
     queryKey: ['kindergarten', id],
-    queryFn: () => api.get(`/kindergartens/${id}`).then(r => r.data),
+    queryFn: () => api.get(`/kindergartens/${id}`).then(r => r.data).catch(() => null),
     enabled: Boolean(id),
   });
 

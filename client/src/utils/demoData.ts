@@ -188,3 +188,72 @@ export const DEMO_AVAILABILITY: { date: string; is_available: boolean }[] = [
   { date: d(3), is_available: false },
   { date: d(8), is_available: false },
 ];
+
+// ─── Substitutes paginated (for SubstitutesPage) ──────────────
+export const DEMO_SUBSTITUTES_PAGINATED = {
+  data: [
+    {
+      id: 'sub-1', first_name: 'מרים', last_name: 'אברהם', phone: '054-1234567',
+      email: 'miriam@example.com', id_number: '123456789', address: 'רחוב הרצל 5, יקנעם',
+      neighborhood: 'מרכז', education_level: 'תואר ראשון', teaching_license_url: null,
+      years_experience: 5, work_permit_valid: true, work_permit_expiry: '2027-06-01',
+      work_permit_number: 'WP-2024-001', status: 'active', total_assignments: 24,
+      rating: 4.8, has_assignment_today: true, assignments_this_month: 8,
+    },
+    {
+      id: 'sub-2', first_name: 'רחל', last_name: 'לוי', phone: '052-9876543',
+      email: 'rachel@example.com', id_number: '234567891', address: 'שדרות ויצמן 12, יקנעם',
+      neighborhood: 'צפון', education_level: 'תואר שני', teaching_license_url: null,
+      years_experience: 8, work_permit_valid: true, work_permit_expiry: '2026-08-15',
+      work_permit_number: 'WP-2024-002', status: 'active', total_assignments: 18,
+      rating: 4.5, has_assignment_today: false, assignments_this_month: 5,
+    },
+    {
+      id: 'sub-3', first_name: 'שרה', last_name: 'כהן', phone: '050-5551234',
+      email: 'sarah@example.com', id_number: '345678912', address: 'רחוב סוקולוב 8, יקנעם',
+      neighborhood: 'דרום', education_level: 'תעודת הוראה', teaching_license_url: null,
+      years_experience: 3, work_permit_valid: true, work_permit_expiry: '2027-01-20',
+      work_permit_number: 'WP-2024-003', status: 'active', total_assignments: 31,
+      rating: 4.9, has_assignment_today: false, assignments_this_month: 12,
+    },
+    {
+      id: 'sub-4', first_name: 'לאה', last_name: 'דוד', phone: '053-7778899',
+      email: 'leah@example.com', id_number: '456789123', address: 'רחוב העצמאות 3, יקנעם',
+      neighborhood: 'מזרח', education_level: 'תואר ראשון', teaching_license_url: null,
+      years_experience: 2, work_permit_valid: false, work_permit_expiry: '2025-03-01',
+      work_permit_number: 'WP-2023-004', status: 'inactive', total_assignments: 7,
+      rating: 4.1, has_assignment_today: false, assignments_this_month: 0,
+    },
+    {
+      id: 'sub-5', first_name: 'נועה', last_name: 'פרידמן', phone: '054-6661234',
+      email: 'noa@example.com', id_number: '567891234', address: 'שדרות רוטשילד 21, יקנעם',
+      neighborhood: 'מרכז', education_level: 'תואר ראשון', teaching_license_url: null,
+      years_experience: 1, work_permit_valid: true, work_permit_expiry: '2028-01-01',
+      work_permit_number: null, status: 'pending_approval', total_assignments: 0,
+      rating: 0, has_assignment_today: false, assignments_this_month: 0,
+    },
+  ],
+  total: 5,
+  page: 1,
+  limit: 20,
+  totalPages: 1,
+};
+
+// ─── Known absences (for KnownAbsencesPage) ──────────────────
+export const DEMO_KNOWN_ABSENCES = [
+  {
+    id: 'ka-1', kindergarten_id: 'kg-1', kindergarten_name: 'גן חבצלת',
+    employee_name: 'יעל כהן', reason: 'training', start_date: d(7), end_date: d(7),
+    notes: 'השתלמות גננות', created_at: new Date().toISOString(),
+  },
+  {
+    id: 'ka-2', kindergarten_id: 'kg-2', kindergarten_name: 'גן נרקיס',
+    employee_name: 'תמר שלום', reason: 'vacation', start_date: d(14), end_date: d(16),
+    notes: 'חופשה שנתית', created_at: new Date().toISOString(),
+  },
+  {
+    id: 'ka-3', kindergarten_id: 'kg-3', kindergarten_name: 'גן רקפת',
+    employee_name: 'חנה ברק', reason: 'medical', start_date: d(3), end_date: d(5),
+    notes: 'ניתוח מתוכנן', created_at: new Date().toISOString(),
+  },
+];

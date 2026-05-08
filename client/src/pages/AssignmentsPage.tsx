@@ -5,6 +5,8 @@ import {
   ChevronRight, ChevronLeft, User, Phone, X, AlertCircle, Star
 } from 'lucide-react';
 import api from '@/utils/api';
+import { useAuthStore } from '@/context/authStore';
+import { DEMO_ASSIGNMENTS, DEMO_KINDERGARTENS, DEMO_SUBSTITUTES } from '@/utils/demoData';
 import toast from 'react-hot-toast';
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isToday, isSameDay, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -67,13 +69,15 @@ export default function AssignmentsPage() {
   const [completeModal, setCompleteModal] = useState<Assignment | null>(null);
 
   const queryClient = useQueryClient();
+  const { isDemoMode } = useAuthStore();
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
   const { data: assignments, isLoading, isError } = useQuery<Assignment[]>({
     queryKey: ['assignments', dateStr],
-    queryFn: () => api.get('/assignments', { params: { date: dateStr } }).then(r => r.data),
+    queryFn: () => api.get('/assignments', { params: { date: dateStr } }).then(r => r.data)
+      .catch(() => isDemoMode ? DEMO_ASSIGNMENTS.filter(a => a.assignment_date === dateStr) as Assignment[] : []),
   });
 
   // B6: Rating mutation for completed assignments
@@ -344,14 +348,16 @@ function CreateAssignmentModal({
   const [endTime, setEndTime] = useState('14:00');
   const [notes, setNotes] = useState('');
 
+  const { isDemoMode } = useAuthStore();
+
   const { data: kindergartens } = useQuery<Kindergarten[]>({
     queryKey: ['kindergartens'],
-    queryFn: () => api.get('/kindergartens').then(r => r.data),
+    queryFn: () => api.get('/kindergartens').then(r => r.data).catch(() => isDemoMode ? DEMO_KINDERGARTENS : []),
   });
 
   const { data: availableSubs } = useQuery<AvailableSub[]>({
     queryKey: ['available-subs', date],
-    queryFn: () => api.get('/substitutes/available', { params: { date } }).then(r => r.data),
+    queryFn: () => api.get('/substitutes/available', { params: { date } }).then(r => r.data).catch(() => isDemoMode ? DEMO_SUBSTITUTES as unknown as AvailableSub[] : []),
   });
 
   const createMutation = useMutation({
