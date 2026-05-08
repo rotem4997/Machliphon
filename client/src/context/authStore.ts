@@ -21,13 +21,47 @@ interface AuthState {
   token: string | null;
   refreshToken: string | null;
   isLoading: boolean;
+  isDemoMode: boolean;
 
   login: (email: string, password: string) => Promise<void>;
-  loginDemo: (role: 'authority_admin' | 'manager' | 'substitute') => void;
+  loginDemo: (role: 'authority_admin' | 'manager' | 'substitute') => Promise<void>;
   logout: () => void;
   refreshAuth: () => Promise<void>;
   updateUser: (updates: Partial<User>) => void;
 }
+
+const DEMO_PROFILES: Record<string, User> = {
+  authority_admin: {
+    id: 'demo-director-1',
+    email: 'director@yokneam.muni.il',
+    role: 'authority_admin',
+    firstName: 'ירון',
+    lastName: 'כהן',
+    phone: '04-9590000',
+    authorityId: 'auth-yokneam-1',
+    authorityName: 'עיריית יקנעם עילית',
+  },
+  manager: {
+    id: 'demo-manager-1',
+    email: 'manager@yokneam.muni.il',
+    role: 'manager',
+    firstName: 'שרה',
+    lastName: 'לוי',
+    phone: '052-1234567',
+    authorityId: 'auth-yokneam-1',
+    authorityName: 'עיריית יקנעם עילית',
+  },
+  substitute: {
+    id: 'demo-sub-1',
+    email: 'miriam@example.com',
+    role: 'substitute',
+    firstName: 'מרים',
+    lastName: 'אברהם',
+    phone: '054-1234567',
+    authorityId: 'auth-yokneam-1',
+    authorityName: 'עיריית יקנעם עילית',
+  },
+};
 
 export const useAuthStore = create<AuthState>()(
   persist(
@@ -36,52 +70,35 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       refreshToken: null,
       isLoading: false,
+      isDemoMode: false,
 
-      loginDemo: (role) => {
-        const profiles: Record<string, User> = {
-          authority_admin: {
-            id: 'demo-director-1',
-            email: 'director@yokneam.muni.il',
-            role: 'authority_admin',
-            firstName: 'ירון',
-            lastName: 'כהן',
-            phone: '04-9590000',
-            authorityId: 'auth-yokneam-1',
-            authorityName: 'עיריית יקנעם עילית',
-          },
-          manager: {
-            id: 'demo-manager-1',
-            email: 'manager@yokneam.muni.il',
-            role: 'manager',
-            firstName: 'שרה',
-            lastName: 'לוי',
-            phone: '052-1234567',
-            authorityId: 'auth-yokneam-1',
-            authorityName: 'עיריית יקנעם עילית',
-          },
-          substitute: {
-            id: 'demo-sub-1',
-            email: 'miriam@example.com',
-            role: 'substitute',
-            firstName: 'מרים',
-            lastName: 'אברהם',
-            phone: '054-1234567',
-            authorityId: 'auth-yokneam-1',
-            authorityName: 'עיריית יקנעם עילית',
-          },
+      loginDemo: async (role) => {
+        const creds: Record<string, { email: string; password: string }> = {
+          authority_admin: { email: 'director@yokneam.muni.il', password: 'Demo1234!' },
+          manager:         { email: 'manager@yokneam.muni.il',  password: 'Demo1234!' },
+          substitute:      { email: 'miriam@example.com',        password: 'Demo1234!' },
         };
-        set({ user: profiles[role], token: `demo-token-${role}-${Date.now()}`, refreshToken: null });
+        set({ isLoading: true });
+        try {
+          const { data } = await api.post('/auth/login', creds[role]);
+          set({ user: data.user, token: data.token, refreshToken: data.refreshToken, isLoading: false, isDemoMode: false });
+        } catch {
+          // API not reachable — fall back to offline demo profile
+          const fakeToken = `demo-token-${role}-${Date.now()}`;
+          set({ user: DEMO_PROFILES[role], token: fakeToken, refreshToken: null, isLoading: false, isDemoMode: true });
+        }
       },
 
       login: async (email, password) => {
         set({ isLoading: true });
         try {
           const { data } = await api.post('/auth/login', { email, password });
-          set({ 
-            user: data.user, 
-            token: data.token, 
+          set({
+            user: data.user,
+            token: data.token,
             refreshToken: data.refreshToken,
-            isLoading: false 
+            isLoading: false,
+            isDemoMode: false,
           });
           api.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
         } catch (error) {
@@ -91,7 +108,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => {
-        set({ user: null, token: null, refreshToken: null });
+        set({ user: null, token: null, refreshToken: null, isDemoMode: false });
         delete api.defaults.headers.common['Authorization'];
       },
 
@@ -113,13 +130,12 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'machliphon-auth',
-      // Never persist demo sessions — they should last only for the browser session.
-      partialize: (state: AuthState) => {
-        if (state.token?.startsWith('demo-token-')) {
-          return { token: null, refreshToken: null, user: null };
-        }
-        return { token: state.token, refreshToken: state.refreshToken, user: state.user };
-      },
+      partialize: (state: AuthState) => ({
+        token: state.token?.startsWith('demo-token-') ? null : state.token,
+        refreshToken: state.token?.startsWith('demo-token-') ? null : state.refreshToken,
+        user: state.token?.startsWith('demo-token-') ? null : state.user,
+        isDemoMode: false,
+      }),
     }
   )
 );

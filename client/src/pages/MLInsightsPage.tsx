@@ -153,36 +153,37 @@ export default function MLInsightsPage() {
 
   const { data: models, isLoading: modelsLoading } = useQuery<ModelsResponse>({
     queryKey: ['ml-models'],
-    queryFn: () => api.get('/api/ml/models').then(r => r.data),
+    queryFn: () => api.get('/ml/models').then(r => r.data).catch(() => null),
   });
 
   const { data: insights, isLoading: insightsLoading } = useQuery<Insights>({
     queryKey: ['ml-insights'],
-    queryFn: () => api.get('/api/ml/insights').then(r => r.data),
+    queryFn: () => api.get('/ml/insights').then(r => r.data).catch(() => null),
   });
 
   const { data: kgs } = useQuery<Kindergarten[]>({
     queryKey: ['kindergartens-list'],
-    queryFn: () => api.get('/api/kindergartens').then(r => r.data),
+    queryFn: () => api.get('/kindergartens').then(r => r.data).catch(() => []),
   });
 
   const { data: forecast, isLoading: forecastLoading } = useQuery<ForecastResponse>({
     queryKey: ['ml-forecast', selectedKg, forecastDays],
     queryFn: () =>
       api
-        .get('/api/ml/forecast', { params: { kindergartenId: selectedKg, days: forecastDays } })
-        .then(r => r.data),
+        .get('/ml/forecast', { params: { kindergartenId: selectedKg, days: forecastDays } })
+        .then(r => r.data)
+        .catch(() => null),
     enabled: !!selectedKg,
   });
 
   const { data: integrity, isLoading: integrityLoading } = useQuery<IntegrityReport>({
     queryKey: ['ml-integrity'],
-    queryFn: () => api.get('/api/ml/integrity-report').then(r => r.data),
+    queryFn: () => api.get('/ml/integrity-report').then(r => r.data).catch(() => null),
   });
 
   const trainMutation = useMutation({
     mutationFn: (kinds?: string[]) =>
-      api.post('/api/ml/train', { kinds, force: true }).then(r => r.data),
+      api.post('/ml/train', { kinds, force: true }).then(r => r.data),
     onSuccess: () => {
       toast.success('האימון הושלם בהצלחה');
       qc.invalidateQueries({ queryKey: ['ml-models'] });

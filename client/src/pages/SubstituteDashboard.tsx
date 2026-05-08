@@ -1,11 +1,14 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  CheckCircle, XCircle, Calendar, MapPin, Clock, AlertCircle,
+  CheckCircle, XCircle, Calendar, MapPin, Clock,
   ChevronRight, ChevronLeft, Camera, Edit3, List, LayoutGrid, Save, X,
 } from 'lucide-react';
 import api, { handleApiError } from '@/utils/api';
 import { useAuthStore } from '@/context/authStore';
+import {
+  DEMO_ASSIGNMENTS, DEMO_AVAILABILITY, DEMO_SUB_PROFILE,
+} from '@/utils/demoData';
 import toast from 'react-hot-toast';
 import { format, parseISO, startOfWeek, addDays, addWeeks, addMonths, subWeeks, subMonths, isSameDay, isSameMonth } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -22,129 +25,6 @@ interface Assignment {
   status: string;
 }
 
-// ─── Mock Data ───────────────────────────────────────────────
-const MOCK_ASSIGNMENTS: Assignment[] = [
-  {
-    id: 'mock-1',
-    assignment_date: format(new Date(), 'yyyy-MM-dd'),
-    start_time: '07:30',
-    end_time: '14:00',
-    kindergarten_name: 'גן חבצלת',
-    kindergarten_address: 'רחוב הרצל 15',
-    neighborhood: 'מרכז',
-    status: 'confirmed',
-  },
-  {
-    id: 'mock-2',
-    assignment_date: format(addDays(new Date(), 1), 'yyyy-MM-dd'),
-    start_time: '07:30',
-    end_time: '13:00',
-    kindergarten_name: 'גן נרקיס',
-    kindergarten_address: 'רחוב ויצמן 8',
-    neighborhood: 'צפון',
-    status: 'pending',
-  },
-  {
-    id: 'mock-3',
-    assignment_date: format(addDays(new Date(), 3), 'yyyy-MM-dd'),
-    start_time: '08:00',
-    end_time: '14:00',
-    kindergarten_name: 'גן רקפת',
-    kindergarten_address: 'שדרות בן גוריון 22',
-    neighborhood: 'דרום',
-    status: 'pending',
-  },
-  {
-    id: 'mock-4',
-    assignment_date: format(addDays(new Date(), 7), 'yyyy-MM-dd'),
-    start_time: '07:30',
-    end_time: '14:00',
-    kindergarten_name: 'גן כלנית',
-    kindergarten_address: 'רחוב סוקולוב 3',
-    neighborhood: 'מרכז',
-    status: 'pending',
-  },
-  {
-    id: 'mock-5',
-    assignment_date: format(addDays(new Date(), 10), 'yyyy-MM-dd'),
-    start_time: '08:00',
-    end_time: '13:30',
-    kindergarten_name: 'גן חבצלת',
-    kindergarten_address: 'רחוב הרצל 15',
-    neighborhood: 'מרכז',
-    status: 'pending',
-  },
-  {
-    id: 'mock-6',
-    assignment_date: format(addDays(new Date(), 14), 'yyyy-MM-dd'),
-    start_time: '07:30',
-    end_time: '14:00',
-    kindergarten_name: 'גן דליה',
-    kindergarten_address: 'רחוב ז׳בוטינסקי 11',
-    neighborhood: 'מזרח',
-    status: 'pending',
-  },
-  {
-    id: 'mock-7',
-    assignment_date: format(addDays(new Date(), 17), 'yyyy-MM-dd'),
-    start_time: '08:00',
-    end_time: '13:00',
-    kindergarten_name: 'גן שושנה',
-    kindergarten_address: 'רחוב הגפן 5',
-    neighborhood: 'צפון',
-    status: 'pending',
-  },
-  {
-    id: 'mock-8',
-    assignment_date: format(addDays(new Date(), 21), 'yyyy-MM-dd'),
-    start_time: '07:30',
-    end_time: '14:00',
-    kindergarten_name: 'גן יסמין',
-    kindergarten_address: 'רחוב העצמאות 19',
-    neighborhood: 'דרום',
-    status: 'pending',
-  },
-  {
-    id: 'mock-past-1',
-    assignment_date: format(addDays(new Date(), -2), 'yyyy-MM-dd'),
-    start_time: '07:30',
-    end_time: '14:00',
-    kindergarten_name: 'גן חבצלת',
-    kindergarten_address: 'רחוב הרצל 15',
-    neighborhood: 'מרכז',
-    status: 'completed',
-  },
-  {
-    id: 'mock-past-2',
-    assignment_date: format(addDays(new Date(), -5), 'yyyy-MM-dd'),
-    start_time: '08:00',
-    end_time: '13:30',
-    kindergarten_name: 'גן נרקיס',
-    kindergarten_address: 'רחוב ויצמן 8',
-    neighborhood: 'צפון',
-    status: 'completed',
-  },
-];
-
-// Mock availability: dates the substitute marked as unavailable
-const MOCK_UNAVAILABLE_DATES = [
-  format(addDays(new Date(), 2), 'yyyy-MM-dd'),
-  format(addDays(new Date(), 5), 'yyyy-MM-dd'),
-  format(addDays(new Date(), 8), 'yyyy-MM-dd'),
-  format(addDays(new Date(), 12), 'yyyy-MM-dd'),
-  format(addDays(new Date(), 19), 'yyyy-MM-dd'),
-];
-
-const MOCK_PROFILE = {
-  first_name: 'שרה',
-  last_name: 'כהן',
-  email: 'sarah.cohen@email.com',
-  phone: '054-1234567',
-  photo_url: '',
-  work_permit_valid: true,
-  work_permit_expiry: '2027-01-01',
-  total_assignments: 24,
-};
 
 type ViewMode = 'week' | 'month' | 'list';
 
@@ -159,22 +39,53 @@ export default function SubstituteDashboard() {
   const [currentDate, setCurrentDate] = useState(today);
   const [selectedDay, setSelectedDay] = useState<Date>(today);
   const [editingProfile, setEditingProfile] = useState(false);
-  const [unavailableDates, setUnavailableDates] = useState<string[]>(MOCK_UNAVAILABLE_DATES);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Profile edit state
   const [profileForm, setProfileForm] = useState({
-    first_name: MOCK_PROFILE.first_name,
-    last_name: MOCK_PROFILE.last_name,
-    email: MOCK_PROFILE.email,
-    phone: MOCK_PROFILE.phone,
-    photo_url: MOCK_PROFILE.photo_url,
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: '',
+    photo_url: '',
   });
 
-  // ─── Queries (fall back to mock data) ─────────────────────
+  const { isDemoMode } = useAuthStore();
+
+  // ─── Queries ──────────────────────────────────────────────
   const { data: profile } = useQuery({
     queryKey: ['my-profile'],
-    queryFn: () => api.get('/substitutes/me').then(r => r.data),
+    queryFn: () => api.get('/substitutes/me').then(r => r.data)
+      .catch(() => isDemoMode ? DEMO_SUB_PROFILE : null),
+  });
+
+  // Multi-month assignment queries for the calendar
+  const visibleMonth = currentDate.getMonth() + 1;
+  const visibleYear = currentDate.getFullYear();
+  const prevDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+  const nextDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
+
+  const { data: assignments } = useQuery<Assignment[]>({
+    queryKey: ['sub-assignments', visibleYear, visibleMonth],
+    queryFn: () => api.get('/assignments', { params: { month: visibleMonth, year: visibleYear } }).then(r => r.data)
+      .catch(() => isDemoMode ? DEMO_ASSIGNMENTS as Assignment[] : []),
+  });
+  const { data: prevMonthAssignments } = useQuery<Assignment[]>({
+    queryKey: ['sub-assignments', prevDate.getFullYear(), prevDate.getMonth() + 1],
+    queryFn: () => api.get('/assignments', { params: { month: prevDate.getMonth() + 1, year: prevDate.getFullYear() } }).then(r => r.data)
+      .catch(() => []),
+  });
+  const { data: nextMonthAssignments } = useQuery<Assignment[]>({
+    queryKey: ['sub-assignments', nextDate.getFullYear(), nextDate.getMonth() + 1],
+    queryFn: () => api.get('/assignments', { params: { month: nextDate.getMonth() + 1, year: nextDate.getFullYear() } }).then(r => r.data)
+      .catch(() => []),
+  });
+
+  // Unavailability records for the current month
+  const { data: availabilityRecords = [] } = useQuery<{ date: string; is_available: boolean }[]>({
+    queryKey: ['sub-availability', visibleYear, visibleMonth],
+    queryFn: () => api.get('/substitutes/availability', { params: { month: visibleMonth, year: visibleYear } }).then(r => r.data)
+      .catch(() => isDemoMode ? DEMO_AVAILABILITY : []),
   });
 
   // Sync profile form when real profile data or auth user loads
@@ -198,18 +109,22 @@ export default function SubstituteDashboard() {
     }
   }, [profile, authUser]);
 
-  const { data: todayAssignment } = useQuery<Assignment>({
-    queryKey: ['today-assignment'],
-    queryFn: async () => {
-      const res = await api.get('/assignments', { params: { date: todayStr } });
-      return res.data[0] || null;
-    },
-  });
+  // Merged assignment list across prev/current/next month
+  const allAssignments = useMemo(
+    () => [...(prevMonthAssignments ?? []), ...(assignments ?? []), ...(nextMonthAssignments ?? [])],
+    [prevMonthAssignments, assignments, nextMonthAssignments],
+  );
 
-  // Track mock assignment status changes locally
-  const [mockStatusOverrides, setMockStatusOverrides] = useState<Record<string, string>>({});
+  // Unavailable date strings derived from availability records
+  const unavailableDates = useMemo(
+    () => availabilityRecords.filter(r => !r.is_available).map(r => r.date),
+    [availabilityRecords],
+  );
 
-  // Use real data if available, else auth store user, else mock
+  const selectedDayStr = format(selectedDay, 'yyyy-MM-dd');
+  const selectedDayAsgn = allAssignments.find(a => a.assignment_date === selectedDayStr) ?? null;
+
+  // Use real data if available, else auth store user
   const p = profile || (authUser ? {
     first_name: authUser.firstName,
     last_name: authUser.lastName,
@@ -219,56 +134,33 @@ export default function SubstituteDashboard() {
     work_permit_valid: true,
     work_permit_expiry: '2027-01-01',
     total_assignments: 0,
-  } : MOCK_PROFILE);
-  const allAssignments = MOCK_ASSIGNMENTS.map(a =>
-    mockStatusOverrides[a.id] ? { ...a, status: mockStatusOverrides[a.id] } : a
-  );
-  const selectedDayStr = format(selectedDay, 'yyyy-MM-dd');
-  const selectedDayAsgn = todayAssignment ?? allAssignments.find(a => a.assignment_date === selectedDayStr) ?? null;
+  } : { first_name: '', last_name: '', email: '', phone: '', photo_url: '', work_permit_valid: true, work_permit_expiry: '2027-01-01', total_assignments: 0 });
 
   const confirmAssignment = useMutation({
-    mutationFn: async (id: string) => {
-      // Handle mock assignments locally instead of calling the API
-      if (id.startsWith('mock-')) {
-        setMockStatusOverrides(prev => ({ ...prev, [id]: 'confirmed' }));
-        return { data: { message: 'ok' } };
-      }
-      return api.patch(`/assignments/${id}/confirm`);
-    },
+    mutationFn: (id: string) => api.patch(`/assignments/${id}/confirm`),
     onSuccess: () => {
       toast.success('✅ אישרת את השיבוץ!');
-      queryClient.invalidateQueries({ queryKey: ['today-assignment'] });
+      queryClient.invalidateQueries({ queryKey: ['sub-assignments'] });
     },
     onError: (err) => handleApiError(err, 'confirmAssignment'),
   });
 
   const markArrived = useMutation({
-    mutationFn: async (id: string) => {
-      if (id.startsWith('mock-')) {
-        setMockStatusOverrides(prev => ({ ...prev, [id]: 'arrived' }));
-        return { data: { message: 'ok' } };
-      }
-      return api.patch(`/assignments/${id}/arrive`);
-    },
+    mutationFn: (id: string) => api.patch(`/assignments/${id}/arrive`),
     onSuccess: () => {
       toast.success('הגעתך אושרה!');
-      queryClient.invalidateQueries({ queryKey: ['today-assignment'] });
+      queryClient.invalidateQueries({ queryKey: ['sub-assignments'] });
     },
     onError: (err) => handleApiError(err, 'markArrived'),
   });
 
   // B4: Substitute cancel
   const cancelAssignment = useMutation({
-    mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
-      if (id.startsWith('mock-')) {
-        setMockStatusOverrides(prev => ({ ...prev, [id]: 'cancelled' }));
-        return {};
-      }
-      return api.patch(`/assignments/${id}/substitute-cancel`, { reason });
-    },
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      api.patch(`/assignments/${id}/substitute-cancel`, { reason }),
     onSuccess: () => {
       toast.success('השיבוץ בוטל.');
-      queryClient.invalidateQueries({ queryKey: ['today-assignment'] });
+      queryClient.invalidateQueries({ queryKey: ['sub-assignments'] });
     },
     onError: () => toast.error('שגיאה בביטול השיבוץ'),
   });
@@ -279,14 +171,12 @@ export default function SubstituteDashboard() {
   const greetingHour = new Date().getHours();
   const greeting = greetingHour < 12 ? 'בוקר טוב' : greetingHour < 17 ? 'צהריים טובים' : 'ערב טוב';
 
-  // ─── Availability toggle — A6: wire to API ───────────────
+  // ─── Availability toggle — wired to API ──────────────────
   const availabilityMutation = useMutation({
     mutationFn: ({ date, isAvailable, reason }: { date: string; isAvailable: boolean; reason?: string }) =>
       api.put('/substitutes/availability', { date, isAvailable, reason }),
     onSuccess: (_, vars) => {
-      setUnavailableDates(prev =>
-        !vars.isAvailable ? [...prev, vars.date] : prev.filter(d => d !== vars.date)
-      );
+      queryClient.invalidateQueries({ queryKey: ['sub-availability'] });
       toast.success(!vars.isAvailable ? 'סומנת כלא זמינה' : 'סומנת כזמינה');
     },
     onError: () => toast.error('שגיאה בעדכון הזמינות'),
@@ -346,10 +236,21 @@ export default function SubstituteDashboard() {
     }
   };
 
-  const saveProfile = () => {
-    setEditingProfile(false);
-    toast.success('הפרופיל עודכן בהצלחה');
-  };
+  const saveProfileMutation = useMutation({
+    mutationFn: () => api.patch('/auth/me', {
+      firstName: profileForm.first_name,
+      lastName: profileForm.last_name,
+      phone: profileForm.phone,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-profile'] });
+      setEditingProfile(false);
+      toast.success('הפרופיל עודכן בהצלחה');
+    },
+    onError: (err) => handleApiError(err, 'PATCH /auth/me'),
+  });
+
+  const saveProfile = () => saveProfileMutation.mutate();
 
   // ─── Week days for calendar ───────────────────────────────
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
@@ -706,7 +607,7 @@ export default function SubstituteDashboard() {
             onClick={() => { setViewMode('list'); }}
             className="card p-4 text-center w-full hover:bg-slate-50 transition-all cursor-pointer"
           >
-            <p className="text-2xl font-black text-navy-900">{p.total_assignments || 24}</p>
+            <p className="text-2xl font-black text-navy-900">{p.total_assignments || allAssignments.filter(a => a.status === 'completed').length}</p>
             <p className="text-xs text-slate-500 mt-0.5">שיבוצים סה"כ</p>
           </button>
         </div>

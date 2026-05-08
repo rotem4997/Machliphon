@@ -4,6 +4,8 @@ import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterv
 import { he } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import api from '@/utils/api';
+import { useAuthStore } from '@/context/authStore';
+import { DEMO_AVAILABILITY } from '@/utils/demoData';
 import toast from 'react-hot-toast';
 import { isHoliday } from '@/utils/holidays';
 
@@ -27,6 +29,7 @@ export default function AvailabilityPage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [reason, setReason] = useState('vacation');
   const queryClient = useQueryClient();
+  const { isDemoMode } = useAuthStore();
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -39,7 +42,7 @@ export default function AvailabilityPage() {
         month: currentMonth.getMonth() + 1,
         year: currentMonth.getFullYear(),
       },
-    }).then(r => r.data).catch(() => []),
+    }).then(r => r.data).catch(() => isDemoMode ? DEMO_AVAILABILITY as AvailabilityRecord[] : []),
   });
 
   const unavailableDates = new Set(

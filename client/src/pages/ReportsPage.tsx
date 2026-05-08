@@ -4,6 +4,8 @@ import {
   BarChart3, FileText, Download, TrendingUp
 } from 'lucide-react';
 import api from '@/utils/api';
+import { useAuthStore } from '@/context/authStore';
+import { DEMO_ASSIGNMENTS, DEMO_NEIGHBORHOODS } from '@/utils/demoData';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -33,74 +35,27 @@ interface NeighborhoodCoverage {
 
 const COLORS = ['#17C98A', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
 
-// ─── Mock fallback data ──────────────────────────────────────
-
-const KG_NAMES = [
-  'גן חבצלת', 'גן נרקיס', 'גן רקפת', 'גן כלנית', 'גן דליה',
-  'גן שושנה', 'גן תמר', 'גן אורית', 'גן ענבל', 'גן שקמה',
-  'גן אביבית', 'גן צבעוני',
-];
-
-const STATUSES = ['completed', 'completed', 'completed', 'arrived', 'confirmed', 'cancelled'];
-
-function buildMockReportAssignments(month: number, year: number): Assignment[] {
-  const result: Assignment[] = [];
-  const daysInMonth = new Date(year, month, 0).getDate();
-  let idx = 0;
-  for (let d = 1; d <= daysInMonth; d++) {
-    const date = new Date(year, month - 1, d);
-    if (date.getDay() === 6 || date.getDay() === 5) continue;
-    const dateStr = format(date, 'yyyy-MM-dd');
-    const count = 8 + (idx % 4);
-    for (let a = 0; a < count; a++) {
-      const status = STATUSES[(idx + a) % STATUSES.length];
-      const hours = status === 'completed' || status === 'arrived' ? 6.5 : null;
-      result.push({
-        id: `mock-rpt-${d}-${a}`,
-        assignment_date: dateStr,
-        status,
-        hours_worked: hours,
-        total_pay: hours ? hours * 55 : null,
-        kindergarten_name: KG_NAMES[a % KG_NAMES.length],
-        substitute_first_name: ['מרים', 'רחל', 'שרה', 'לאה', 'נועה'][a % 5],
-        substitute_last_name: ['אברהם', 'לוי', 'כהן', 'דוד', 'פרידמן'][a % 5],
-      });
-    }
-    idx++;
-  }
-  return result;
-}
-
-const MOCK_NEIGHBORHOODS: NeighborhoodCoverage[] = [
-  { neighborhood: 'מרכז',  coverage_pct: 94, total_assignments: 87,  uncovered_absences: 5,  kindergartens_count: 3 },
-  { neighborhood: 'צפון',  coverage_pct: 88, total_assignments: 71,  uncovered_absences: 8,  kindergartens_count: 3 },
-  { neighborhood: 'דרום',  coverage_pct: 82, total_assignments: 63,  uncovered_absences: 11, kindergartens_count: 2 },
-  { neighborhood: 'מזרח',  coverage_pct: 79, total_assignments: 58,  uncovered_absences: 13, kindergartens_count: 2 },
-  { neighborhood: 'מערב',  coverage_pct: 91, total_assignments: 76,  uncovered_absences: 6,  kindergartens_count: 2 },
-];
 
 export default function ReportsPage() {
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
+  const { isDemoMode } = useAuthStore();
 
   const { data: assignmentsRaw } = useQuery<Assignment[]>({
     queryKey: ['report-assignments', month, year],
-    queryFn: () => api.get('/assignments', { params: { month, year } }).then(r => r.data).catch(() => []),
+    queryFn: () => api.get('/assignments', { params: { month, year } }).then(r => r.data)
+      .catch(() => isDemoMode ? DEMO_ASSIGNMENTS as Assignment[] : []),
   });
 
   const { data: neighborhoodsRaw } = useQuery<NeighborhoodCoverage[]>({
     queryKey: ['coverage-neighborhoods'],
-    queryFn: () => api.get('/dashboard/coverage-by-neighborhood').then(r => r.data).catch(() => []),
+    queryFn: () => api.get('/dashboard/coverage-by-neighborhood').then(r => r.data)
+      .catch(() => isDemoMode ? DEMO_NEIGHBORHOODS : []),
   });
 
-  const assignments = assignmentsRaw && assignmentsRaw.length > 0
-    ? assignmentsRaw
-    : buildMockReportAssignments(month, year);
-
-  const neighborhoods = neighborhoodsRaw && neighborhoodsRaw.length > 0
-    ? neighborhoodsRaw
-    : MOCK_NEIGHBORHOODS;
+  const assignments = assignmentsRaw ?? [];
+  const neighborhoods = neighborhoodsRaw ?? [];
 
   // Compute stats
   const totalAssignments = assignments?.length ?? 0;

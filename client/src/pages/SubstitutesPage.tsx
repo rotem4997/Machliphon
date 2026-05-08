@@ -7,6 +7,8 @@ import {
   CalendarX, Trash2, History,
 } from 'lucide-react';
 import api from '@/utils/api';
+import { useAuthStore } from '@/context/authStore';
+import { DEMO_SUBSTITUTES_PAGINATED } from '@/utils/demoData';
 import toast from 'react-hot-toast';
 
 // ─── Types ────────────────────────────────────────────────────
@@ -103,6 +105,7 @@ export default function SubstitutesPage() {
   const [permitForm, setPermitForm] = useState({ number: '', expiry: '', valid: true });
 
   const queryClient = useQueryClient();
+  const { isDemoMode } = useAuthStore();
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 350);
@@ -117,7 +120,8 @@ export default function SubstitutesPage() {
       const params = new URLSearchParams({ page: String(page), limit: '20' });
       if (debouncedSearch) params.set('search', debouncedSearch);
       if (filterStatus) params.set('status', filterStatus);
-      return api.get(`/substitutes?${params}`).then(r => r.data);
+      return api.get(`/substitutes?${params}`).then(r => r.data)
+        .catch(() => isDemoMode ? DEMO_SUBSTITUTES_PAGINATED as PaginatedSubstitutes : { data: [], total: 0, page: 1, limit: 20, totalPages: 0 });
     },
   });
 

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, AlertCircle, User, Building } from 'lucide-react';
 import api from '@/utils/api';
+import { useAuthStore } from '@/context/authStore';
+import { DEMO_KINDERGARTENS } from '@/utils/demoData';
 import toast from 'react-hot-toast';
 
 interface MappingRow {
@@ -35,19 +37,21 @@ export default function ManagerKindergartensPage() {
   const [form, setForm] = useState({ managerId: '', kindergartenId: '' });
   const queryClient = useQueryClient();
 
+  const { isDemoMode } = useAuthStore();
+
   const { data: mappings = [], isLoading, isError } = useQuery<MappingRow[]>({
     queryKey: ['manager-kindergartens'],
-    queryFn: () => api.get('/manager-kindergartens').then(r => r.data),
+    queryFn: () => api.get('/manager-kindergartens').then(r => r.data).catch(() => []),
   });
 
   const { data: managers = [] } = useQuery<Manager[]>({
     queryKey: ['managers-list'],
-    queryFn: () => api.get('/manager-kindergartens/managers').then(r => r.data),
+    queryFn: () => api.get('/manager-kindergartens/managers').then(r => r.data).catch(() => []),
   });
 
   const { data: kindergartens = [] } = useQuery<Kindergarten[]>({
     queryKey: ['kindergartens'],
-    queryFn: () => api.get('/kindergartens').then(r => r.data),
+    queryFn: () => api.get('/kindergartens').then(r => r.data).catch(() => isDemoMode ? DEMO_KINDERGARTENS as Kindergarten[] : []),
   });
 
   const addMutation = useMutation({

@@ -109,10 +109,7 @@ app.get('/health', async (_, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    env: process.env.NODE_ENV,
     db: dbStatus,
-    hasDbUrl: !!process.env.DATABASE_URL,
-    hasJwtSecret: !!process.env.JWT_SECRET,
   });
 });
 
