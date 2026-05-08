@@ -77,7 +77,7 @@ export default function AssignmentsPage() {
   const { data: assignments, isLoading, isError } = useQuery<Assignment[]>({
     queryKey: ['assignments', dateStr],
     queryFn: () => api.get('/assignments', { params: { date: dateStr } }).then(r => r.data)
-      .catch(() => isDemoMode ? DEMO_ASSIGNMENTS.filter(a => a.assignment_date === dateStr) as Assignment[] : []),
+      .catch(() => isDemoMode ? DEMO_ASSIGNMENTS.filter(a => a.assignment_date === dateStr) as unknown as Assignment[] : []),
   });
 
   // B6: Rating mutation for completed assignments

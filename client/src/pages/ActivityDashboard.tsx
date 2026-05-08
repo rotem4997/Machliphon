@@ -7,7 +7,7 @@ import {
 import api from '@/utils/api';
 import { useAuthStore } from '@/context/authStore';
 import { DEMO_ACTIVITY_FEED, DEMO_LIVE_STATS } from '@/utils/demoData';
-import { formatDistanceToNow, parseISO } from 'date-fns';
+import { formatDistanceToNow, parseISO, format } from 'date-fns';
 import { he } from 'date-fns/locale';
 
 // ─── Types ──────────────────────────────────────────────────
