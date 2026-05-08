@@ -96,8 +96,8 @@ export default function ReportsPage() {
   });
 
   const { data: neighborhoodsRaw } = useQuery<NeighborhoodCoverage[]>({
-    queryKey: ['coverage-neighborhoods'],
-    queryFn: () => api.get('/dashboard/coverage-by-neighborhood').then(r => r.data).catch(() => []),
+    queryKey: ['coverage-neighborhoods', month, year],
+    queryFn: () => api.get('/dashboard/coverage-by-neighborhood', { params: { month, year } }).then(r => r.data).catch(() => []),
   });
 
   const assignments = assignmentsRaw && assignmentsRaw.length > 0
@@ -110,12 +110,13 @@ export default function ReportsPage() {
 
   // Derived stats
   const totalAssignments = assignments.length;
+  // "done" = completed OR arrived (consistent with leaderboard metric)
+  const done = assignments.filter(a => a.status === 'completed' || a.status === 'arrived');
   const completed = assignments.filter(a => a.status === 'completed');
-  const cancelled = assignments.filter(a => a.status === 'cancelled');
-  const totalHours = completed.reduce((sum, a) => sum + (Number(a.hours_worked) || 0), 0);
+  const totalHours = done.reduce((sum, a) => sum + (Number(a.hours_worked) || 0), 0);
   const totalPay = completed.reduce((sum, a) => sum + (Number(a.total_pay) || 0), 0);
   const completionRate = totalAssignments > 0
-    ? Math.round((completed.length / totalAssignments) * 100)
+    ? Math.round((done.length / totalAssignments) * 100)
     : 0;
 
   // Status distribution for pie
@@ -171,7 +172,8 @@ export default function ReportsPage() {
 
   const handleExport = async () => {
     try {
-      const response = await api.get(`/assignments/export/csv?month=${month}&year=${year}`, {
+      const response = await api.get('/assignments/export/csv', {
+        params: { month, year },
         responseType: 'blob',
       });
       const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });

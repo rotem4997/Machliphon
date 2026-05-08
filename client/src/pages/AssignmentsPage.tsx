@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Calendar, Plus, CheckCircle, XCircle, Clock, MapPin,
+  Calendar, Plus, MapPin,
   ChevronRight, ChevronLeft, User, Phone, X, AlertCircle, Star
 } from 'lucide-react';
 import api from '@/utils/api';
@@ -65,6 +65,7 @@ export default function AssignmentsPage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [completeModal, setCompleteModal] = useState<Assignment | null>(null);
+  const [rateModal, setRateModal] = useState<Assignment | null>(null);
 
   const queryClient = useQueryClient();
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
@@ -209,13 +210,22 @@ export default function AssignmentsPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-1.5 items-end">
                   {(a.status === 'arrived' || a.status === 'confirmed') && (
                     <button
                       onClick={() => setCompleteModal(a)}
                       className="text-xs text-mint-600 hover:text-mint-700 font-medium whitespace-nowrap"
                     >
                       סיום ושעות
+                    </button>
+                  )}
+                  {a.status === 'completed' && (
+                    <button
+                      onClick={() => setRateModal(a)}
+                      className="flex items-center gap-1 text-xs text-amber-500 hover:text-amber-600 font-medium whitespace-nowrap"
+                    >
+                      <Star size={12} />
+                      דרגי
                     </button>
                   )}
                   {a.status !== 'completed' && a.status !== 'cancelled' && (
@@ -258,6 +268,18 @@ export default function AssignmentsPage() {
         />
       )}
 
+      {/* Rate Modal */}
+      {rateModal && (
+        <RateModal
+          assignment={rateModal}
+          onClose={() => setRateModal(null)}
+          onSubmit={(rating, ratingNotes) => {
+            rateMutation.mutate({ id: rateModal.id, rating, ratingNotes });
+            setRateModal(null);
+          }}
+        />
+      )}
+
       {/* Create Modal */}
       {showCreateModal && (
         <CreateAssignmentModal
@@ -269,6 +291,84 @@ export default function AssignmentsPage() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+/* ────── Rate Assignment Modal ────── */
+function RateModal({
+  assignment,
+  onClose,
+  onSubmit,
+}: {
+  assignment: Assignment;
+  onClose: () => void;
+  onSubmit: (rating: number, ratingNotes: string) => void;
+}) {
+  const [rating, setRating] = useState(0);
+  const [hovered, setHovered] = useState(0);
+  const [notes, setNotes] = useState('');
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="card p-6 w-full max-w-sm slide-in">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-navy-900">דירוג מחליפה</h3>
+          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-lg">
+            <X size={18} />
+          </button>
+        </div>
+        <p className="text-sm text-slate-600 mb-5">
+          {assignment.substitute_first_name} {assignment.substitute_last_name} — {assignment.kindergarten_name}
+        </p>
+
+        {/* Star picker */}
+        <div className="flex justify-center gap-2 mb-4">
+          {[1, 2, 3, 4, 5].map(n => (
+            <button
+              key={n}
+              onMouseEnter={() => setHovered(n)}
+              onMouseLeave={() => setHovered(0)}
+              onClick={() => setRating(n)}
+              className="p-1 transition-transform hover:scale-110"
+            >
+              <Star
+                size={32}
+                className={`transition-colors ${
+                  n <= (hovered || rating) ? 'fill-amber-400 text-amber-400' : 'text-slate-300'
+                }`}
+              />
+            </button>
+          ))}
+        </div>
+
+        {rating > 0 && (
+          <p className="text-center text-sm font-semibold text-navy-900 mb-4">
+            {['', 'גרוע', 'סביר', 'טוב', 'מצוין', 'מושלם'][rating]}
+          </p>
+        )}
+
+        <div className="mb-4">
+          <label className="label">הערות (אופציונלי)</label>
+          <textarea
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            className="input min-h-[60px] resize-y"
+            placeholder="הערות על הביצוע..."
+          />
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={() => rating > 0 && onSubmit(rating, notes)}
+            disabled={rating === 0}
+            className="btn-primary flex-1 disabled:opacity-50"
+          >
+            שמור דירוג
+          </button>
+          <button onClick={onClose} className="btn-secondary">ביטול</button>
+        </div>
+      </div>
     </div>
   );
 }

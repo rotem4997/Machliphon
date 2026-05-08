@@ -91,7 +91,11 @@ router.get('/alerts', asyncHandler(async (req: AuthRequest, res: Response) => {
     FROM substitutes s JOIN users u ON s.user_id = u.id
     WHERE s.authority_id = $1 AND s.work_permit_expiry BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'
   `, [authorityId]);
-  expiring.rows.forEach(r => alerts.push({ type: 'permit_expiring', severity: 'medium', message: `תיק עובד של ${r.first_name} ${r.last_name} פג ב-${r.work_permit_expiry}`, data: r }));
+  expiring.rows.forEach(r => {
+    const expDate = new Date(r.work_permit_expiry);
+    const formatted = `${expDate.getDate().toString().padStart(2, '0')}/${(expDate.getMonth() + 1).toString().padStart(2, '0')}/${expDate.getFullYear()}`;
+    alerts.push({ type: 'permit_expiring', severity: 'medium', message: `תיק עובד של ${r.first_name} ${r.last_name} פג ב-${formatted}`, data: r });
+  });
 
   const knownUnplanned = await query(`
     SELECT ka.*, k.name as kindergarten_name FROM known_absences ka JOIN kindergartens k ON ka.kindergarten_id = k.id

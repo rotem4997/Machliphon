@@ -57,16 +57,11 @@ export default function AppLayout() {
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="px-5 py-6 border-b border-navy-800">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Logo size={36} />
-            <div>
-              <h1 className="font-black text-white text-lg leading-tight">מחליפון</h1>
-              <p className="text-navy-400 text-xs">{user.authorityName || 'מערכת'}</p>
-            </div>
-          </div>
-          <div className="text-navy-300 hover:text-white">
-            <NotificationBell />
+        <div className="flex items-center gap-3">
+          <Logo size={36} />
+          <div>
+            <h1 className="font-black text-white text-lg leading-tight">מחליפון</h1>
+            <p className="text-navy-400 text-xs">{user.authorityName || 'מערכת'}</p>
           </div>
         </div>
       </div>

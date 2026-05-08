@@ -236,7 +236,7 @@ export default function DashboardPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [currentDate, setCurrentDate] = useState(today);
   const [selectedDay, setSelectedDay] = useState<Date>(today);
-  const [assignModal, setAssignModal] = useState<{ kindergartenId: string; date: string } | null>(null);
+  const [assignModal, setAssignModal] = useState<{ kindergartenId: string; date: string; absenceId?: string } | null>(null);
 
   // ─── Queries ──────────────────────────────────────────────
   const { data: stats } = useQuery<DashboardStats>({
@@ -301,11 +301,16 @@ export default function DashboardPage() {
     return fromApi.length > 0 ? fromApi : MOCK_ABSENCES;
   }, [prevMonthAbsences, absences, nextMonthAbsences]);
 
-  const liveStats = stats ?? MOCK_STATS;
+  // Fall back to mock when API returns null OR genuinely empty/zero data
+  const liveStats: DashboardStats = useMemo(() => {
+    if (!stats) return MOCK_STATS;
+    const hasRealData = stats.totalSubstitutes > 0 || stats.todayTotal > 0 || stats.weekCoverage?.length > 0;
+    return hasRealData ? stats : MOCK_STATS;
+  }, [stats]);
   const liveAlerts = alerts ?? MOCK_ALERTS;
 
   const weekCoverageData = useMemo(() => {
-    const raw = liveStats.weekCoverage ?? MOCK_WEEK_COVERAGE;
+    const raw = liveStats.weekCoverage?.length > 0 ? liveStats.weekCoverage : MOCK_WEEK_COVERAGE;
     return raw.map(r => ({
       ...r,
       label: format(parseISO(r.date), 'EEE', { locale: he }),
@@ -366,14 +371,16 @@ export default function DashboardPage() {
 
   // ─── Assign mutation ──────────────────────────────────────
   const assignMutation = useMutation({
-    mutationFn: (vars: { kindergartenId: string; substituteId: string; date: string }) =>
+    mutationFn: (vars: { kindergartenId: string; substituteId: string; date: string; absenceId?: string }) =>
       api.post('/assignments', {
         kindergartenId: vars.kindergartenId,
         substituteId: vars.substituteId,
         assignmentDate: vars.date,
+        absenceId: vars.absenceId,
       }).then(r => r.data),
     onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: ['assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['absences'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-alerts'] });
       const kg = kgs.find(k => k.id === vars.kindergartenId);
@@ -384,7 +391,7 @@ export default function DashboardPage() {
   });
 
   const handleAssign = (kindergartenId: string, substituteId: string, date: string) => {
-    assignMutation.mutate({ kindergartenId, substituteId, date });
+    assignMutation.mutate({ kindergartenId, substituteId, date, absenceId: assignModal?.absenceId });
   };
 
   // ─── Render ───────────────────────────────────────────────
@@ -761,7 +768,7 @@ export default function DashboardPage() {
                             </p>
                           </div>
                           <button
-                            onClick={() => setAssignModal({ kindergartenId: absence.kindergarten_id, date: selectedDayStr })}
+                            onClick={() => setAssignModal({ kindergartenId: absence.kindergarten_id, date: selectedDayStr, absenceId: absence.id })}
                             className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1 flex-shrink-0"
                           >
                             <Plus size={12} />

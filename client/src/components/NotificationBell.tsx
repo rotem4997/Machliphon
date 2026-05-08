@@ -17,9 +17,19 @@ interface Notification {
 const typeColors: Record<string, string> = {
   assignment_request: 'bg-sky-100 text-sky-700',
   assignment_confirmed: 'bg-mint-100 text-mint-700',
+  assignment_cancelled: 'bg-red-100 text-red-700',
   permit_expiring: 'bg-amber-100 text-amber-700',
   uncovered_absence: 'bg-red-100 text-red-700',
   system: 'bg-slate-100 text-slate-600',
+};
+
+const typeLabels: Record<string, string> = {
+  assignment_request: 'שיבוץ',
+  assignment_confirmed: 'אושר',
+  assignment_cancelled: 'בוטל',
+  permit_expiring: 'תיק עובד',
+  uncovered_absence: 'חוסר',
+  system: 'מערכת',
 };
 
 export default function NotificationBell() {
@@ -37,14 +47,16 @@ export default function NotificationBell() {
 
   const { data: countData } = useQuery<{ count: number }>({
     queryKey: ['notifications-count'],
-    queryFn: () => api.get('/notifications/unread-count').then(r => r.data).catch(() => ({ count: 0 })),
+    queryFn: () => api.get('/notifications/unread-count').then(r => r.data),
     refetchInterval: 30_000,
+    retry: false,
   });
 
   const { data: notifications } = useQuery<Notification[]>({
     queryKey: ['notifications'],
-    queryFn: () => api.get('/notifications').then(r => r.data).catch(() => []),
+    queryFn: () => api.get('/notifications').then(r => r.data),
     enabled: open,
+    retry: false,
   });
 
   const markRead = useMutation({
@@ -70,18 +82,20 @@ export default function NotificationBell() {
       <button
         onClick={() => setOpen(o => !o)}
         className="relative text-slate-600 hover:text-navy-900 transition-colors p-1"
-        aria-label="התראות"
+        aria-label={unread > 0 ? `התראות, ${unread} לא נקראו` : 'התראות'}
+        aria-expanded={open}
+        aria-haspopup="true"
       >
         <Bell size={22} />
         {unread > 0 && (
-          <span className="absolute -top-1 -right-1 w-4.5 h-4.5 min-w-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none px-0.5">
+          <span className="absolute -top-1 -right-1 w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
             {unread > 9 ? '9+' : unread}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-200 z-50 overflow-hidden">
+        <div className="absolute end-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-200 z-50 overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
             <h3 className="font-bold text-navy-900 text-sm">
@@ -95,7 +109,7 @@ export default function NotificationBell() {
                   className="text-xs text-slate-500 hover:text-navy-700 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-slate-50"
                 >
                   <CheckCheck size={13} />
-                  סמן הכל כנקרא
+                  סמן הכל
                 </button>
               )}
               <button onClick={() => setOpen(false)} className="p-1 hover:bg-slate-100 rounded-lg text-slate-400">
@@ -122,7 +136,7 @@ export default function NotificationBell() {
                   <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full mt-0.5 whitespace-nowrap flex-shrink-0 ${
                     typeColors[n.type] ?? typeColors.system
                   }`}>
-                    {n.title.slice(0, 8)}
+                    {typeLabels[n.type] ?? 'מערכת'}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-navy-900 truncate">{n.title}</p>
