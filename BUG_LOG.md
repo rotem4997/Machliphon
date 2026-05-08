@@ -16,9 +16,9 @@ Legend: 🔴 Open · 🟡 In Progress · ✅ Fixed · 🔵 Deferred (no real DB 
 | B-003 | CRITICAL | Security/Backend | **Broken Access Control** — Any manager could cancel ANY authority's assignments (`DELETE /assignments/:id` missing authority_id scope) | ✅ Fixed | Security Agent — Authority scope added |
 | B-004 | CRITICAL | Security/Backend | **Broken Access Control** — Manager could create assignment for foreign authority's kindergarten (`POST /assignments` missing authority check) | ✅ Fixed | Security Agent — kgAuthCheck added |
 | B-005 | CRITICAL | Frontend | **CSV export always 401** — ReportsPage used `window.open()` to download CSV, which doesn't send Authorization header | ✅ Fixed | Sprint 1 — Replaced with Blob download |
-| B-006 | CRITICAL | Frontend | **AbsencesPage completely disconnected from API** — Uses hardcoded mock data, never calls backend | 🔵 Deferred | Pending real DB connection |
-| B-007 | CRITICAL | Frontend | **DashboardPage ignores real API** — Uses MOCK_ASSIGNMENTS/MOCK_KINDERGARTENS, overwrites API response | 🔵 Deferred | Pending real DB connection |
-| B-008 | CRITICAL | Frontend | **SubstituteDashboard calendar uses mock data** — Real assignments never fetched for calendar view | 🔵 Deferred | Pending real DB connection |
+| B-006 | CRITICAL | Frontend | **AbsencesPage completely disconnected from API** — Uses hardcoded mock data, never calls backend | ✅ Fixed | Full rewrite: useQuery + useMutation wired to /api/absences |
+| B-007 | CRITICAL | Frontend | **DashboardPage ignores real API** — Uses MOCK_ASSIGNMENTS/MOCK_KINDERGARTENS, overwrites API response | ✅ Fixed | Removed all mock fallbacks; real API data only |
+| B-008 | CRITICAL | Frontend | **SubstituteDashboard calendar uses mock data** — Real assignments never fetched for calendar view | ✅ Fixed | Multi-month useQuery for assignments + availability wired |
 | B-009 | CRITICAL | Frontend | **ProfilePage save is a no-op** — `handleSave()` shows toast but never calls API, changes lost on refresh | ✅ Fixed | Sprint 1 — PATCH /auth/me wired |
 | B-010 | CRITICAL | Frontend | **Substitute availability toggle never persists** — `toggleAvailability()` mutates local state only, never calls `PUT /api/substitutes/availability` | ✅ Fixed | Sprint 1 — API call wired |
 
@@ -32,7 +32,7 @@ Legend: 🔴 Open · 🟡 In Progress · ✅ Fixed · 🔵 Deferred (no real DB 
 | B-012 | HIGH | Security/Backend | **JWT tokens valid 7 days** — Access tokens expiry was too long (7d), allows stolen token misuse | ✅ Fixed | Security Agent — Shortened to 1h |
 | B-013 | HIGH | Security/Backend | **Helmet CSP disabled** — `contentSecurityPolicy: false` left XSS mitigations off | ✅ Fixed | Security Agent — Default CSP re-enabled |
 | B-014 | HIGH | Security/Backend | **JSON body limit 10MB** — Oversized bodies could cause DoS | ✅ Fixed | Security Agent — Reduced to 100KB |
-| B-015 | HIGH | Frontend | **SubstituteDashboard assignments use mock data** — Upcoming assignments calendar never reflects reality | 🔵 Deferred | Pending real DB connection |
+| B-015 | HIGH | Frontend | **SubstituteDashboard assignments use mock data** — Upcoming assignments calendar never reflects reality | ✅ Fixed | Wired with B-008 fix |
 | B-016 | HIGH | Frontend | **No error states in useQuery** — On API failure, pages show blank without feedback to user | ✅ Fixed | Sprint 1 — Error states added to all queries |
 
 ---
@@ -55,10 +55,10 @@ Legend: 🔴 Open · 🟡 In Progress · ✅ Fixed · 🔵 Deferred (no real DB 
 
 | ID | Severity | Area | Description | Status | Fixed In |
 |----|----------|------|-------------|--------|----------|
-| B-024 | LOW | Backend | **jwt.TokenExpiredError check unreachable** — Dead code in `middleware/auth.ts`: TokenExpiredError IS-A JsonWebTokenError, second instanceof branch never runs | 🟡 In Progress | Will fix in cleanup |
-| B-025 | LOW | Frontend | **DashboardPage fetches /kindergartens but result unused** — wastes a network call | 🔵 Deferred | With mock data removal |
+| B-024 | LOW | Backend | **jwt.TokenExpiredError check unreachable** — Dead code in `middleware/auth.ts`: TokenExpiredError IS-A JsonWebTokenError, second instanceof branch never runs | ✅ Fixed | Reordered: TokenExpiredError checked first |
+| B-025 | LOW | Frontend | **DashboardPage fetches /kindergartens but result unused** — wastes a network call | ✅ Fixed | Now used for kindergarten count KPI |
 | B-026 | LOW | Frontend | **`super_admin` authorityId typed too wide** — `req.query.authorityId` is `string | ParsedQs | ...` not narrowed before use in SQL | 🔵 Deferred | Low risk — SQL parameterized |
-| B-027 | LOW | Security | **GET /health leaks internal config** — Exposes `NODE_ENV`, presence of DB URL, JWT secret status | 🟡 In Progress | Restrict to internal only |
+| B-027 | LOW | Security | **GET /health leaks internal config** — Exposes `NODE_ENV`, presence of DB URL, JWT secret status | ✅ Fixed | Removed sensitive fields from /health response |
 | B-028 | LOW | Security | **No account lockout after N failed logins** — Rate limiting (20/15min) partially mitigates but not sufficient | 🔵 Deferred | Post-MVP hardening |
 | B-029 | LOW | Security | **No DB-backed refresh token blacklist** — Stolen refresh token is valid for 30 days with no revocation path | 🔵 Deferred | Post-MVP hardening |
 

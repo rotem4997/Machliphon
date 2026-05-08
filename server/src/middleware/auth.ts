@@ -50,16 +50,16 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
     req.user = result.rows[0];
     next();
   } catch (error) {
-    if (error instanceof jwt.JsonWebTokenError) {
-      return next(new AuthenticationError('טוקן לא תקין.', {
-        source: `${req.method} ${req.originalUrl}`,
-        detail: `JWT error: ${error.message}`,
-      }));
-    }
     if (error instanceof jwt.TokenExpiredError) {
       return next(new AuthenticationError('פג תוקף הכניסה. נדרשת כניסה מחדש.', {
         source: `${req.method} ${req.originalUrl}`,
         detail: 'Token expired',
+      }));
+    }
+    if (error instanceof jwt.JsonWebTokenError) {
+      return next(new AuthenticationError('טוקן לא תקין.', {
+        source: `${req.method} ${req.originalUrl}`,
+        detail: `JWT error: ${error.message}`,
       }));
     }
     next(error);
