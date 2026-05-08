@@ -1,13 +1,15 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Calendar, ClipboardList,
   BarChart3, Settings, LogOut, Bell, Menu, X, Activity,
   CalendarCheck, Building2, BookOpen, Brain,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore, UserRole } from '@/context/authStore';
 import api from '@/utils/api';
 import Logo from '@/components/Logo';
+import NotificationPanel from '@/components/NotificationPanel';
 
 const navItems: Record<UserRole, { href: string; label: string; icon: React.ReactNode }[]> = {
   authority_admin: [
@@ -47,8 +49,10 @@ const navItems: Record<UserRole, { href: string; label: string; icon: React.Reac
 };
 
 export default function AppLayout() {
-  const { user, logout } = useAuthStore();
+  const { user, logout, isDemoMode } = useAuthStore();
+  const queryClient = useQueryClient();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
@@ -62,8 +66,12 @@ export default function AppLayout() {
     return () => clearInterval(id);
   }, []);
 
+  const handleCloseNotifications = () => {
+    setShowNotifications(false);
+    queryClient.invalidateQueries({ queryKey: ['notifications-unread'] });
+  };
+
   if (!user) return null;
-  const { isDemoMode } = useAuthStore();
   const links = navItems[user.role] || navItems.manager;
 
   const Sidebar = () => (
@@ -109,6 +117,18 @@ export default function AppLayout() {
           </div>
         </div>
         <button
+          onClick={() => setShowNotifications(true)}
+          className="nav-link w-full relative"
+        >
+          <Bell size={18} />
+          התראות
+          {unreadCount > 0 && (
+            <span className="mr-auto min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
+        </button>
+        <button
           onClick={logout}
           className="nav-link w-full text-red-400 hover:text-red-300 hover:bg-red-900/20"
         >
@@ -153,7 +173,11 @@ export default function AppLayout() {
             <Logo size={28} />
             <span className="font-black text-navy-900">מחליפון</span>
           </div>
-          <button className="text-slate-600 relative">
+          <button
+            onClick={() => setShowNotifications(true)}
+            className="text-slate-600 relative"
+            aria-label="התראות"
+          >
             <Bell size={22} />
             {unreadCount > 0 && (
               <span className="absolute -top-1 -left-1 min-w-[16px] h-4 px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
@@ -176,6 +200,11 @@ export default function AppLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Notification slide-out panel */}
+      {showNotifications && (
+        <NotificationPanel onClose={handleCloseNotifications} />
+      )}
     </div>
   );
 }
