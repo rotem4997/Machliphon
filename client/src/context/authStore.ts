@@ -80,10 +80,14 @@ export const useAuthStore = create<AuthState>()(
         };
         set({ isLoading: true });
         try {
-          const { data } = await api.post('/auth/login', creds[role]);
+          // 3-second timeout: if the real API doesn't respond quickly, fall straight to demo mode
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 3000);
+          const { data } = await api.post('/auth/login', creds[role], { signal: controller.signal });
+          clearTimeout(timer);
           set({ user: data.user, token: data.token, refreshToken: data.refreshToken, isLoading: false, isDemoMode: false });
         } catch {
-          // API not reachable — fall back to offline demo profile
+          // API unreachable, slow, or returned an error — fall back to offline demo profile
           const fakeToken = `demo-token-${role}-${Date.now()}`;
           set({ user: DEMO_PROFILES[role], token: fakeToken, refreshToken: null, isLoading: false, isDemoMode: true });
         }
