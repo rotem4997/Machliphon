@@ -1,3 +1,6 @@
+// Inline SVG logo component for מחליפון
+// Two people with swap arrows representing substitute management
+
 interface LogoProps {
   size?: number;
   className?: string;
@@ -13,26 +16,20 @@ export default function Logo({ size = 36, className = '' }: LogoProps) {
       fill="none"
       className={className}
     >
-      <defs>
-        <linearGradient id="logo-warm-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#FF8C42" />
-          <stop offset="100%" stopColor="#FFD166" />
-        </linearGradient>
-      </defs>
-
-      {/* Warm gradient squircle background */}
-      <rect width="64" height="64" rx="20" fill="url(#logo-warm-grad)" />
-
-      {/* Rounded 5-pointed star — control points are the sharp tips,
-          bezier curves naturally round them without complex math */}
-      <path
-        d="M37.9 23.9 Q53 25 41.5 35 Q45 50 32 42 Q19 50 22.5 35 Q11 25 26.1 23.9 Q32 10 37.9 23.9Z"
-        fill="white"
-        opacity="0.95"
-      />
-
-      {/* Tiny circle at center for depth */}
-      <circle cx="32" cy="32" r="4.5" fill="url(#logo-warm-grad)" opacity="0.6" />
+      <rect width="64" height="64" rx="16" fill="#2DD4A8" />
+      <g transform="translate(12, 14)">
+        {/* Left person */}
+        <circle cx="10" cy="10" r="5" fill="white" opacity="0.9" />
+        <path d="M10 17c-5 0-8 3-8 6v2h16v-2c0-3-3-6-8-6z" fill="white" opacity="0.9" />
+        {/* Right person */}
+        <circle cx="30" cy="10" r="5" fill="white" opacity="0.9" />
+        <path d="M30 17c-5 0-8 3-8 6v2h16v-2c0-3-3-6-8-6z" fill="white" opacity="0.9" />
+        {/* Swap arrows */}
+        <path d="M16 28L24 28" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+        <path d="M22 25L25 28L22 31" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M24 34L16 34" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+        <path d="M18 37L15 34L18 31" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      </g>
     </svg>
   );
 }
