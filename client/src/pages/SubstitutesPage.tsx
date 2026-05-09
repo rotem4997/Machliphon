@@ -103,6 +103,8 @@ export default function SubstitutesPage() {
   const [rejectReason, setRejectReason] = useState('');
   const [permitTarget, setPermitTarget] = useState<Substitute | null>(null);
   const [permitForm, setPermitForm] = useState({ number: '', expiry: '', valid: true });
+  const [licenseFile, setLicenseFile] = useState<File | null>(null);
+  const [uploadingLicense, setUploadingLicense] = useState(false);
 
   const queryClient = useQueryClient();
   const { isDemoMode } = useAuthStore();
@@ -166,18 +168,32 @@ export default function SubstitutesPage() {
   });
 
   const permitMutation = useMutation({
-    mutationFn: ({ id }: { id: string }) =>
-      api.patch(`/substitutes/${id}/permit`, {
+    mutationFn: async ({ id }: { id: string }) => {
+      await api.patch(`/substitutes/${id}/permit`, {
         workPermitValid: permitForm.valid,
         workPermitNumber: permitForm.number,
         workPermitExpiry: permitForm.expiry || null,
-      }),
+      });
+      if (licenseFile) {
+        setUploadingLicense(true);
+        const fd = new FormData();
+        fd.append('licenseFile', licenseFile);
+        await api.post(`/substitutes/${id}/upload-license`, fd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+      }
+    },
     onSuccess: () => {
       toast.success('תיק עובד עודכן בהצלחה');
       setPermitTarget(null);
+      setLicenseFile(null);
+      setUploadingLicense(false);
       queryClient.invalidateQueries({ queryKey: ['substitutes'] });
     },
-    onError: () => toast.error('שגיאה בעדכון תיק עובד'),
+    onError: () => {
+      setUploadingLicense(false);
+      toast.error('שגיאה בעדכון תיק עובד');
+    },
   });
 
   return (
@@ -411,14 +427,35 @@ export default function SubstitutesPage() {
               <input type="checkbox" id="permitValid" checked={permitForm.valid} onChange={e => setPermitForm(p => ({ ...p, valid: e.target.checked }))} className="w-4 h-4" />
               <label htmlFor="permitValid" className="text-sm text-slate-700">תיק עובד תקף</label>
             </div>
+            <div>
+              <label className="label">העלאת קובץ רישיון / אישור עבודה</label>
+              <label className="flex flex-col items-center gap-2 border-2 border-dashed border-slate-200 rounded-xl p-4 cursor-pointer hover:border-mint-400 hover:bg-mint-50 transition-colors">
+                <Upload size={20} className="text-slate-400" />
+                <span className="text-sm text-slate-500">
+                  {licenseFile ? licenseFile.name : 'לחץ לבחירת קובץ (PDF / תמונה, עד 5MB)'}
+                </span>
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  className="hidden"
+                  onChange={e => setLicenseFile(e.target.files?.[0] ?? null)}
+                />
+              </label>
+              {permitTarget.teaching_license_url && (
+                <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                  <GraduationCap size={12} />
+                  קובץ קיים: <a href={permitTarget.teaching_license_url} target="_blank" rel="noreferrer" className="text-sky-500 hover:underline truncate">{permitTarget.teaching_license_url.split('/').pop()}</a>
+                </p>
+              )}
+            </div>
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setPermitTarget(null)} className="btn-secondary text-sm">ביטול</button>
+              <button onClick={() => { setPermitTarget(null); setLicenseFile(null); }} className="btn-secondary text-sm">ביטול</button>
               <button
                 onClick={() => permitMutation.mutate({ id: permitTarget.id })}
-                disabled={permitMutation.isPending}
+                disabled={permitMutation.isPending || uploadingLicense}
                 className="btn-primary text-sm disabled:opacity-50"
               >
-                {permitMutation.isPending ? 'שומר...' : 'שמור'}
+                {uploadingLicense ? 'מעלה קובץ...' : permitMutation.isPending ? 'שומר...' : 'שמור'}
               </button>
             </div>
           </div>
