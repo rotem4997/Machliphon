@@ -77,12 +77,12 @@ export default function AppLayout() {
   const Sidebar = () => (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className="px-5 py-6 border-b border-white/10">
+      <div className="px-5 py-6 border-b border-navy-800">
         <div className="flex items-center gap-3">
           <Logo size={36} />
           <div>
             <h1 className="font-black text-white text-lg leading-tight">מחליפון</h1>
-            <p className="text-white/50 text-xs">{user.authorityName || 'מערכת'}</p>
+            <p className="text-navy-400 text-xs">{user.authorityName || 'מערכת'}</p>
           </div>
         </div>
       </div>
@@ -106,15 +106,15 @@ export default function AppLayout() {
       </nav>
 
       {/* User info + logout */}
-      <div className="px-3 py-4 border-t border-white/10">
+      <div className="px-3 py-4 border-t border-navy-800">
         <div className="flex items-center gap-3 px-3 py-2 mb-2">
-          <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white" style={{background: 'rgba(255,107,53,0.7)'}}>
+          <div className="w-8 h-8 rounded-full bg-navy-700 flex items-center justify-center text-sm font-bold text-mint-400" >
 
             {user.firstName[0]}{user.lastName[0]}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-white text-sm font-medium truncate">{user.firstName} {user.lastName}</p>
-            <p className="text-white/50 text-xs truncate">{user.email}</p>
+            <p className="text-navy-400 text-xs truncate">{user.email}</p>
           </div>
         </div>
         <button
@@ -141,9 +141,9 @@ export default function AppLayout() {
   );
 
   return (
-    <div className="flex h-screen bg-warm-50" dir="rtl">
+    <div className="flex h-screen bg-slate-50" dir="rtl">
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex w-64 flex-col flex-shrink-0" style={{background: 'linear-gradient(160deg, #2C1A0E 0%, #3D2810 60%, #52391A 100%)'}}>
+      <aside className="hidden lg:flex w-64 bg-navy-900 flex-col flex-shrink-0">
         <Sidebar />
       </aside>
 
@@ -151,8 +151,7 @@ export default function AppLayout() {
       {sidebarOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
-          <aside className="absolute right-0 top-0 bottom-0 w-64 flex flex-col z-10" style={{background: 'linear-gradient(160deg, #2C1A0E 0%, #3D2810 60%, #52391A 100%)'}}>
-
+          <aside className="absolute right-0 top-0 bottom-0 w-64 bg-navy-900 flex flex-col z-10">
             <button
               onClick={() => setSidebarOpen(false)}
               className="absolute left-3 top-3 text-navy-400 hover:text-white"
@@ -167,7 +166,7 @@ export default function AppLayout() {
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top bar - mobile */}
-        <header className="lg:hidden bg-white border-b border-warm-100 px-4 py-3 flex items-center justify-between">
+        <header className="lg:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
           <button onClick={() => setSidebarOpen(true)} className="text-slate-600">
             <Menu size={22} />
           </button>
