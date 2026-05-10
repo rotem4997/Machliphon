@@ -658,4 +658,23 @@ router.patch('/:id/permit', requireRole('manager', 'authority_admin'), asyncHand
   return res.json({ message: 'תיק עובד עודכן בהצלחה.' });
 }));
 
+// POST /api/substitutes/:id/upload-license — upload teaching license / work permit document
+router.post('/:id/upload-license', requireRole('manager', 'authority_admin'), upload.single('licenseFile'), asyncHandler(async (req: AuthRequest, res: Response) => {
+  if (!req.file) {
+    throw new ValidationError('לא נמצא קובץ להעלאה.', { source: 'POST /substitutes/:id/upload-license', detail: 'No file in request' });
+  }
+  const fileUrl = `/uploads/${req.file.filename}`;
+  const result = await query(
+    `UPDATE substitutes SET teaching_license_url = $1, updated_at = NOW()
+     WHERE id = $2 AND authority_id = $3 RETURNING id`,
+    [fileUrl, req.params.id, req.user!.authority_id]
+  );
+  if (result.rows.length === 0) {
+    // Remove orphaned uploaded file
+    fs.unlink(req.file.path, () => {});
+    throw new NotFoundError('מחליפה לא נמצאה.', { source: 'POST /substitutes/:id/upload-license', detail: `Substitute ${req.params.id} not found` });
+  }
+  return res.json({ message: 'קובץ הועלה בהצלחה.', url: fileUrl });
+}));
+
 export default router;
