@@ -70,7 +70,7 @@ function validateEmail(email: string): string | null {
 
 // ─── CSV Export ──────────────────────────────────────────────
 function exportToCSV(subs: Substitute[]) {
-  const BOM = '\uFEFF';
+  const BOM = '﻿';
   const headers = ['שם פרטי', 'שם משפחה', 'טלפון', 'אימייל', 'ת.ז.', 'כתובת', 'שכונה', 'השכלה', 'תיק עובד', 'סטטוס', 'שיבוצים החודש', 'סה"כ שיבוצים'];
   const rows = subs.map(s => [
     s.first_name, s.last_name, s.phone, s.email, s.id_number,
@@ -103,6 +103,8 @@ export default function SubstitutesPage() {
   const [rejectReason, setRejectReason] = useState('');
   const [permitTarget, setPermitTarget] = useState<Substitute | null>(null);
   const [permitForm, setPermitForm] = useState({ number: '', expiry: '', valid: true });
+  const [licenseFile, setLicenseFile] = useState<File | null>(null);
+  const [uploadingLicense, setUploadingLicense] = useState(false);
 
   const queryClient = useQueryClient();
   const { isDemoMode } = useAuthStore();
@@ -166,18 +168,32 @@ export default function SubstitutesPage() {
   });
 
   const permitMutation = useMutation({
-    mutationFn: ({ id }: { id: string }) =>
-      api.patch(`/substitutes/${id}/permit`, {
+    mutationFn: async ({ id }: { id: string }) => {
+      await api.patch(`/substitutes/${id}/permit`, {
         workPermitValid: permitForm.valid,
         workPermitNumber: permitForm.number,
         workPermitExpiry: permitForm.expiry || null,
-      }),
+      });
+      if (licenseFile) {
+        setUploadingLicense(true);
+        const fd = new FormData();
+        fd.append('licenseFile', licenseFile);
+        await api.post(`/substitutes/${id}/upload-license`, fd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+      }
+    },
     onSuccess: () => {
       toast.success('תיק עובד עודכן בהצלחה');
       setPermitTarget(null);
+      setLicenseFile(null);
+      setUploadingLicense(false);
       queryClient.invalidateQueries({ queryKey: ['substitutes'] });
     },
-    onError: () => toast.error('שגיאה בעדכון תיק עובד'),
+    onError: () => {
+      setUploadingLicense(false);
+      toast.error('שגיאה בעדכון תיק עובד');
+    },
   });
 
   return (
@@ -411,14 +427,35 @@ export default function SubstitutesPage() {
               <input type="checkbox" id="permitValid" checked={permitForm.valid} onChange={e => setPermitForm(p => ({ ...p, valid: e.target.checked }))} className="w-4 h-4" />
               <label htmlFor="permitValid" className="text-sm text-slate-700">תיק עובד תקף</label>
             </div>
+            <div>
+              <label className="label">העלאת קובץ רישיון / אישור עבודה</label>
+              <label className="flex flex-col items-center gap-2 border-2 border-dashed border-slate-200 rounded-xl p-4 cursor-pointer hover:border-mint-400 hover:bg-mint-50 transition-colors">
+                <Upload size={20} className="text-slate-400" />
+                <span className="text-sm text-slate-500">
+                  {licenseFile ? licenseFile.name : 'לחץ לבחירת קובץ (PDF / תמונה, עד 5MB)'}
+                </span>
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  className="hidden"
+                  onChange={e => setLicenseFile(e.target.files?.[0] ?? null)}
+                />
+              </label>
+              {permitTarget.teaching_license_url && (
+                <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                  <GraduationCap size={12} />
+                  קובץ קיים: <a href={permitTarget.teaching_license_url} target="_blank" rel="noreferrer" className="text-sky-500 hover:underline truncate">{permitTarget.teaching_license_url.split('/').pop()}</a>
+                </p>
+              )}
+            </div>
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setPermitTarget(null)} className="btn-secondary text-sm">ביטול</button>
+              <button onClick={() => { setPermitTarget(null); setLicenseFile(null); }} className="btn-secondary text-sm">ביטול</button>
               <button
                 onClick={() => permitMutation.mutate({ id: permitTarget.id })}
-                disabled={permitMutation.isPending}
+                disabled={permitMutation.isPending || uploadingLicense}
                 className="btn-primary text-sm disabled:opacity-50"
               >
-                {permitMutation.isPending ? 'שומר...' : 'שמור'}
+                {uploadingLicense ? 'מעלה קובץ...' : permitMutation.isPending ? 'שומר...' : 'שמור'}
               </button>
             </div>
           </div>
@@ -493,501 +530,3 @@ function CreateSubstituteModal({ onClose, onSuccess }: { onClose: () => void; on
   };
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const newErrors: Record<string, string> = {};
-
-    if (!form.firstName) newErrors.firstName = 'שדה חובה';
-    if (!form.lastName) newErrors.lastName = 'שדה חובה';
-    const idErr = validateIdNumber(form.idNumber);
-    if (idErr) newErrors.idNumber = idErr;
-    const phoneErr = validatePhone(form.phone);
-    if (phoneErr) newErrors.phone = phoneErr;
-    const emailErr = validateEmail(form.email);
-    if (emailErr) newErrors.email = emailErr;
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      toast.error('יש לתקן את השגיאות בטופס');
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append('firstName', form.firstName);
-    formData.append('lastName', form.lastName);
-    formData.append('phone', form.phone);
-    formData.append('email', form.email);
-    formData.append('idNumber', form.idNumber);
-    formData.append('street', form.street);
-    formData.append('city', form.city);
-    formData.append('zipCode', form.zipCode);
-    formData.append('educationLevel', form.educationLevel);
-    if (file) formData.append('teachingLicense', file);
-
-    createMutation.mutate(formData);
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="card p-6 w-full max-w-lg slide-in max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold text-navy-900 text-lg">הוספת מחליפה חדשה</h3>
-          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-lg">
-            <X size={18} />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Name */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="label">שם פרטי *</label>
-              <input className={`input ${errors.firstName ? 'border-red-400 focus:ring-red-400' : ''}`} value={form.firstName} onChange={e => update('firstName', e.target.value)} />
-              {errors.firstName && <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>}
-            </div>
-            <div>
-              <label className="label">שם משפחה *</label>
-              <input className={`input ${errors.lastName ? 'border-red-400 focus:ring-red-400' : ''}`} value={form.lastName} onChange={e => update('lastName', e.target.value)} />
-              {errors.lastName && <p className="text-red-500 text-xs mt-1">{errors.lastName}</p>}
-            </div>
-          </div>
-
-          {/* ID */}
-          <div>
-            <label className="label">תעודת זהות * (9 ספרות)</label>
-            <input
-              className={`input ${errors.idNumber ? 'border-red-400 focus:ring-red-400' : ''}`}
-              value={form.idNumber}
-              onChange={e => update('idNumber', e.target.value)}
-              placeholder="123456789"
-              maxLength={9}
-              dir="ltr"
-            />
-            {errors.idNumber && <p className="text-red-500 text-xs mt-1">{errors.idNumber}</p>}
-          </div>
-
-          {/* Phone + Email */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="label">טלפון * (10 ספרות)</label>
-              <input
-                className={`input ${errors.phone ? 'border-red-400 focus:ring-red-400' : ''}`}
-                type="tel"
-                value={form.phone}
-                onChange={e => update('phone', e.target.value)}
-                placeholder="0541234567"
-                maxLength={10}
-                dir="ltr"
-              />
-              {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
-            </div>
-            <div>
-              <label className="label">אימייל *</label>
-              <input
-                className={`input ${errors.email ? 'border-red-400 focus:ring-red-400' : ''}`}
-                type="email"
-                value={form.email}
-                onChange={e => update('email', e.target.value)}
-                placeholder="name@email.com"
-                dir="ltr"
-              />
-              {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
-            </div>
-          </div>
-
-          {/* Address */}
-          <fieldset className="border border-slate-200 rounded-xl p-3 space-y-3">
-            <legend className="text-sm font-semibold text-navy-900 px-2">כתובת</legend>
-            <div>
-              <label className="text-xs text-slate-500">רחוב</label>
-              <input className="input mt-0.5" value={form.street} onChange={e => update('street', e.target.value)} placeholder="רחוב הרצל 5" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-slate-500">עיר</label>
-                <input className="input mt-0.5" value={form.city} onChange={e => update('city', e.target.value)} placeholder="תל אביב" />
-              </div>
-              <div>
-                <label className="text-xs text-slate-500">מיקוד</label>
-                <input className="input mt-0.5" value={form.zipCode} onChange={e => update('zipCode', e.target.value)} placeholder="6120101" maxLength={7} dir="ltr" />
-              </div>
-            </div>
-          </fieldset>
-
-          {/* Education */}
-          <div>
-            <label className="label">השכלה</label>
-            <select className="input" value={form.educationLevel} onChange={e => update('educationLevel', e.target.value)}>
-              <option value="">בחר...</option>
-              <option value="תעודת הוראה">תעודת הוראה</option>
-              <option value="סמינר למורות">סמינר למורות</option>
-              <option value="תואר ראשון בחינוך">תואר ראשון בחינוך</option>
-              <option value="תואר שני בגיל הרך">תואר שני בגיל הרך</option>
-              <option value="תואר ראשון אחר">תואר ראשון אחר</option>
-              <option value="אחר">אחר</option>
-            </select>
-          </div>
-
-          {/* Teaching License Upload */}
-          <div>
-            <label className="label">רישיון הוראה (PDF, JPG, PNG עד 5MB)</label>
-            <div className="relative">
-              <input
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png"
-                onChange={e => setFile(e.target.files?.[0] || null)}
-                className="hidden"
-                id="license-upload"
-              />
-              <label
-                htmlFor="license-upload"
-                className="flex items-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-mint-300 hover:bg-mint-50/50 transition-colors"
-              >
-                <Upload size={18} className="text-slate-400" />
-                <span className="text-sm text-slate-600">
-                  {file ? file.name : 'לחץ לבחירת קובץ...'}
-                </span>
-              </label>
-            </div>
-          </div>
-
-          <div className="flex gap-2 pt-2">
-            <button type="submit" disabled={createMutation.isPending} className="btn-primary flex-1 flex items-center justify-center gap-2">
-              {createMutation.isPending ? 'יוצר...' : (
-                <>
-                  <Plus size={16} />
-                  צור מחליפה
-                </>
-              )}
-            </button>
-            <button type="button" onClick={onClose} className="btn-secondary">ביטול</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-/* ────── Substitute Detail Modal ────── */
-function SubstituteDetailModal({
-  sub,
-  onClose,
-  onApprove,
-  onUnavailability,
-}: {
-  sub: Substitute;
-  onClose: () => void;
-  onApprove: (sub: Substitute) => void;
-  onUnavailability: (sub: Substitute) => void;
-}) {
-  const navigate = useNavigate();
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="card p-6 w-full max-w-md slide-in max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold text-navy-900 text-lg">פרטי מחליפה</h3>
-          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-lg">
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Avatar + Name */}
-        <div className="flex flex-col items-center mb-5">
-          <div className="w-20 h-20 rounded-full bg-navy-900 flex items-center justify-center mb-3">
-            <span className="text-2xl font-bold text-mint-400">{sub.first_name[0]}{sub.last_name[0]}</span>
-          </div>
-          <h2 className="text-lg font-bold text-navy-900">{sub.first_name} {sub.last_name}</h2>
-          <div className="flex items-center gap-2 mt-1">
-            <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${statusLabels[sub.status]?.cls}`}>
-              {statusLabels[sub.status]?.label}
-            </span>
-            {sub.status === 'active' && (
-              sub.has_assignment_today ? (
-                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium bg-blue-100 text-blue-700">
-                  <Clock size={12} />
-                  משובצת היום
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium bg-mint-100 text-mint-700">
-                  <CheckCircle size={12} />
-                  זמינה היום
-                </span>
-              )
-            )}
-          </div>
-        </div>
-
-        {/* Info */}
-        <div className="divide-y divide-slate-100 space-y-0">
-          <DetailRow icon={Phone} label="טלפון" value={sub.phone} />
-          <DetailRow icon={Mail} label="אימייל" value={sub.email} />
-          <DetailRow icon={CreditCard} label="ת.ז." value={sub.id_number} />
-          <DetailRow icon={MapPin} label="כתובת" value={sub.address || ''} />
-          {sub.neighborhood && <DetailRow icon={MapPin} label="שכונה" value={sub.neighborhood} />}
-          <DetailRow icon={GraduationCap} label="השכלה" value={sub.education_level || ''} />
-          <div className="flex items-center gap-3 py-3">
-            {sub.work_permit_valid ? (
-              <CheckCircle size={16} className="text-mint-500 flex-shrink-0" />
-            ) : (
-              <XCircle size={16} className="text-red-500 flex-shrink-0" />
-            )}
-            <div className="flex-1">
-              <p className="text-xs text-slate-500">תיק עובד</p>
-              <p className={`text-sm font-medium ${sub.work_permit_valid ? 'text-mint-600' : 'text-red-600'}`}>
-                {sub.work_permit_valid ? 'תקף' : 'לא תקף'}
-                {sub.work_permit_expiry && (
-                  <span className="text-slate-400 font-normal text-xs mr-2">
-                    עד {new Date(sub.work_permit_expiry).toLocaleDateString('he-IL')}
-                  </span>
-                )}
-              </p>
-            </div>
-          </div>
-          {sub.teaching_license_url && (
-            <div className="flex items-center gap-3 py-3">
-              <GraduationCap size={16} className="text-slate-400 flex-shrink-0" />
-              <div className="flex-1">
-                <p className="text-xs text-slate-500">רישיון הוראה</p>
-                <a
-                  href={sub.teaching_license_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm font-medium text-sky-600 hover:text-sky-700"
-                >
-                  צפה בקובץ
-                </a>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 gap-3 mt-4">
-          <div className="bg-slate-50 rounded-xl p-3 text-center">
-            <p className="text-xl font-black text-navy-900">{sub.assignments_this_month}</p>
-            <p className="text-xs text-slate-500">שיבוצים החודש</p>
-          </div>
-          <div className="bg-slate-50 rounded-xl p-3 text-center">
-            <p className="text-xl font-black text-navy-900">{sub.total_assignments}</p>
-            <p className="text-xs text-slate-500">שיבוצים סה"כ</p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2 mt-4">
-          {sub.status === 'pending_approval' && (
-            <button
-              onClick={() => onApprove(sub)}
-              className="btn-primary flex-1 flex items-center justify-center gap-2"
-            >
-              <UserCheck size={16} />
-              אשר מחליפה
-            </button>
-          )}
-          <button
-            onClick={() => onUnavailability(sub)}
-            className="btn-secondary flex items-center gap-1.5 text-sm"
-          >
-            <CalendarX size={15} />
-            סמן חופשה
-          </button>
-          <button
-            onClick={() => { onClose(); navigate(`/substitutes/${sub.id}/history`); }}
-            className="btn-secondary flex items-center gap-1.5 text-sm"
-          >
-            <History size={15} />
-            היסטוריה מלאה
-          </button>
-          <button onClick={onClose} className="btn-secondary text-sm">סגור</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DetailRow({ icon: Icon, label, value }: { icon: typeof Phone; label: string; value: string }) {
-  if (!value) return null;
-  return (
-    <div className="flex items-center gap-3 py-3">
-      <Icon size={16} className="text-slate-400 flex-shrink-0" />
-      <div className="flex-1 min-w-0">
-        <p className="text-xs text-slate-500">{label}</p>
-        <p className="text-sm font-medium text-navy-900 truncate">{value}</p>
-      </div>
-    </div>
-  );
-}
-
-/* ────── Unavailability Modal ────── */
-interface UnavailabilityEntry {
-  id: string;
-  date: string;
-  reason: string;
-}
-
-const REASON_LABELS: Record<string, string> = {
-  חופשה: 'חופשה',
-  מחלה: 'מחלה',
-  אישי: 'אישי',
-  הדרכה: 'הדרכה',
-  אחר: 'אחר',
-};
-
-function UnavailabilityModal({ sub, onClose }: { sub: Substitute; onClose: () => void }) {
-  const queryClient = useQueryClient();
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
-  const [reason, setReason] = useState('חופשה');
-  const [formError, setFormError] = useState('');
-
-  const { data: entries = [], isLoading } = useQuery<UnavailabilityEntry[]>({
-    queryKey: ['unavailability', sub.id],
-    queryFn: () => api.get(`/substitutes/${sub.id}/unavailability`).then(r => r.data),
-  });
-
-  const addMutation = useMutation({
-    mutationFn: (body: { fromDate: string; toDate: string; reason: string }) =>
-      api.post(`/substitutes/${sub.id}/unavailability`, body),
-    onSuccess: () => {
-      toast.success('החופשה נוספה בהצלחה');
-      setFromDate('');
-      setToDate('');
-      setReason('חופשה');
-      queryClient.invalidateQueries({ queryKey: ['unavailability', sub.id] });
-      queryClient.invalidateQueries({ queryKey: ['substitutes'] });
-    },
-    onError: (err: any) => {
-      const msg = err.response?.data?.error;
-      toast.error(typeof msg === 'string' ? msg : 'שגיאה בהוספת החופשה');
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (date: string) =>
-      api.delete(`/substitutes/${sub.id}/unavailability`, { data: { fromDate: date, toDate: date } }),
-    onSuccess: () => {
-      toast.success('תאריך הוסר');
-      queryClient.invalidateQueries({ queryKey: ['unavailability', sub.id] });
-      queryClient.invalidateQueries({ queryKey: ['substitutes'] });
-    },
-    onError: () => toast.error('שגיאה בהסרת התאריך'),
-  });
-
-  const handleAdd = (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError('');
-    if (!fromDate || !toDate) {
-      setFormError('יש למלא תאריך התחלה וסיום');
-      return;
-    }
-    if (toDate < fromDate) {
-      setFormError('תאריך סיום חייב להיות גדול או שווה לתאריך התחלה');
-      return;
-    }
-    addMutation.mutate({ fromDate, toDate, reason });
-  };
-
-  const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString('he-IL');
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="card p-6 w-full max-w-md slide-in max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="font-bold text-navy-900 text-lg">ניהול חופשות</h3>
-            <p className="text-sm text-slate-500">{sub.first_name} {sub.last_name}</p>
-          </div>
-          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-lg">
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Existing entries */}
-        <div className="mb-5">
-          <h4 className="text-sm font-semibold text-navy-900 mb-2">תאריכים קיימים</h4>
-          {isLoading ? (
-            <div className="h-12 skeleton rounded-lg" />
-          ) : entries.length === 0 ? (
-            <p className="text-sm text-slate-400 py-3 text-center">אין תאריכים מוגדרים</p>
-          ) : (
-            <ul className="divide-y divide-slate-100">
-              {entries.map(entry => (
-                <li key={entry.id} className="flex items-center justify-between py-2.5 gap-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <CalendarX size={14} className="text-slate-400 flex-shrink-0" />
-                    <span className="text-sm font-medium text-navy-900">{formatDate(entry.date)}</span>
-                    <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
-                      {REASON_LABELS[entry.reason] ?? entry.reason}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => deleteMutation.mutate(entry.date)}
-                    disabled={deleteMutation.isPending}
-                    className="text-slate-300 hover:text-red-400 transition-colors flex-shrink-0"
-                    title="הסר תאריך"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {/* Add form */}
-        <div className="border-t border-slate-100 pt-4">
-          <h4 className="text-sm font-semibold text-navy-900 mb-3">הוספת חופשה</h4>
-          <form onSubmit={handleAdd} className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label">מתאריך *</label>
-                <input
-                  type="date"
-                  className="input text-sm"
-                  value={fromDate}
-                  onChange={e => { setFromDate(e.target.value); setFormError(''); }}
-                />
-              </div>
-              <div>
-                <label className="label">עד תאריך *</label>
-                <input
-                  type="date"
-                  className="input text-sm"
-                  value={toDate}
-                  min={fromDate || undefined}
-                  onChange={e => { setToDate(e.target.value); setFormError(''); }}
-                />
-              </div>
-            </div>
-            <div>
-              <label className="label">סיבה</label>
-              <select className="input text-sm" value={reason} onChange={e => setReason(e.target.value)}>
-                <option value="חופשה">חופשה</option>
-                <option value="מחלה">מחלה</option>
-                <option value="אישי">אישי</option>
-                <option value="הדרכה">הדרכה</option>
-                <option value="אחר">אחר</option>
-              </select>
-            </div>
-            {formError && (
-              <p className="text-xs text-red-500 flex items-center gap-1">
-                <AlertCircle size={13} />
-                {formError}
-              </p>
-            )}
-            <div className="flex gap-2 justify-end pt-1">
-              <button type="button" onClick={onClose} className="btn-secondary text-sm">סגור</button>
-              <button
-                type="submit"
-                disabled={addMutation.isPending}
-                className="btn-primary text-sm flex items-center gap-1.5 disabled:opacity-50"
-              >
-                <Plus size={15} />
-                {addMutation.isPending ? 'שומר...' : 'הוסף'}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  );
-}
