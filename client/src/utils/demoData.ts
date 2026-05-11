@@ -189,6 +189,25 @@ export const DEMO_AVAILABILITY: { date: string; is_available: boolean }[] = [
   { date: d(8), is_available: false },
 ];
 
+// ─── Open positions (for substitute self-assignment) ──────────
+export const DEMO_OPEN_POSITIONS = [
+  {
+    id: 'abs-1', absence_date: d(0),
+    kindergarten_name: 'גן חבצלת', kindergarten_address: 'רחוב הרצל 15', neighborhood: 'מרכז',
+    absent_employee_name: 'יעל כהן', absent_employee_role: 'teacher', absence_reason: 'sick',
+  },
+  {
+    id: 'abs-3', absence_date: d(1),
+    kindergarten_name: 'גן נרקיס', kindergarten_address: 'רחוב ויצמן 8', neighborhood: 'צפון',
+    absent_employee_name: 'תמר שלום', absent_employee_role: 'teacher', absence_reason: 'known',
+  },
+  {
+    id: 'abs-4', absence_date: d(2),
+    kindergarten_name: 'גן כלנית', kindergarten_address: 'רחוב סוקולוב 3', neighborhood: 'מרכז',
+    absent_employee_name: 'אילנה דוד', absent_employee_role: 'assistant', absence_reason: 'sick',
+  },
+];
+
 // ─── Substitutes paginated (for SubstitutesPage) ──────────────
 export const DEMO_SUBSTITUTES_PAGINATED = {
   data: [

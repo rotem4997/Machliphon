@@ -7,6 +7,32 @@ import { ValidationError, NotFoundError } from '../errors/AppError';
 const router = Router();
 router.use(authenticate);
 
+// GET /api/absences/open — substitutes browse open positions in their authority
+router.get('/open', requireRole('substitute'), asyncHandler(async (req: AuthRequest, res: Response) => {
+  const authorityId = req.user!.authority_id;
+  const subResult = await query('SELECT id FROM substitutes WHERE user_id = $1 AND status = $2', [req.user!.id, 'active']);
+  if (subResult.rows.length === 0) {
+    return res.json([]);
+  }
+  const subId = subResult.rows[0].id;
+  // Return upcoming open absences, excluding dates where the sub already has an assignment
+  const result = await query(`
+    SELECT ar.*, k.name as kindergarten_name, k.address as kindergarten_address, k.neighborhood
+    FROM absence_reports ar
+    JOIN kindergartens k ON ar.kindergarten_id = k.id
+    WHERE k.authority_id = $1
+      AND ar.status = 'open'
+      AND ar.absence_date >= CURRENT_DATE
+      AND ar.absence_date NOT IN (
+        SELECT assignment_date FROM assignments
+        WHERE substitute_id = $2 AND status NOT IN ('cancelled')
+      )
+    ORDER BY ar.absence_date ASC
+    LIMIT 20
+  `, [authorityId, subId]);
+  return res.json(result.rows);
+}));
+
 // GET /api/absences
 router.get('/', requireRole('manager', 'authority_admin', 'super_admin'), asyncHandler(async (req: AuthRequest, res: Response) => {
   const { date, status, kindergartenId, month, year } = req.query;

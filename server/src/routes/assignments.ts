@@ -147,6 +147,75 @@ router.post('/', requireRole('manager', 'authority_admin', 'super_admin'), async
   return res.status(201).json(result.rows[0]);
 }));
 
+// POST /api/assignments/self-assign — substitute self-assigns to an open position
+router.post('/self-assign', requireRole('substitute'), asyncHandler(async (req: AuthRequest, res: Response) => {
+  const { absenceId } = req.body;
+  if (!absenceId) {
+    throw new ValidationError('חסר מזהה היעדרות.', { source: 'POST /api/assignments/self-assign', detail: 'Missing absenceId' });
+  }
+  const subResult = await query(
+    `SELECT s.id, s.work_permit_valid, s.authority_id FROM substitutes s WHERE s.user_id = $1 AND s.status = 'active'`,
+    [req.user!.id]
+  );
+  if (subResult.rows.length === 0) {
+    throw new NotFoundError('מחליפה לא נמצאה.', { source: 'POST /api/assignments/self-assign', detail: `No active substitute for user ${req.user!.id}` });
+  }
+  const sub = subResult.rows[0];
+  if (!sub.work_permit_valid) {
+    throw new ValidationError('אין לך תיק עובד תקף.', { source: 'POST /api/assignments/self-assign', detail: 'Substitute permit invalid' });
+  }
+  const absenceResult = await query(`
+    SELECT ar.*, k.authority_id as kg_authority_id
+    FROM absence_reports ar
+    JOIN kindergartens k ON ar.kindergarten_id = k.id
+    WHERE ar.id = $1 AND ar.status = 'open' AND ar.absence_date >= CURRENT_DATE
+  `, [absenceId]);
+  if (absenceResult.rows.length === 0) {
+    throw new NotFoundError('ההיעדרות לא נמצאה או כבר מכוסה.', { source: 'POST /api/assignments/self-assign', detail: `Absence ${absenceId} not found or not open` });
+  }
+  const absence = absenceResult.rows[0];
+  if (absence.kg_authority_id !== sub.authority_id) {
+    throw new ValidationError('לא ניתן להירשם להיעדרות זו.', { source: 'POST /api/assignments/self-assign', detail: 'Authority mismatch' });
+  }
+  const holiday = getHolidayName(absence.absence_date);
+  if (holiday) {
+    throw new ValidationError(`לא ניתן לשבץ בחג/מועד: ${holiday}.`, { source: 'POST /api/assignments/self-assign', detail: `Holiday: ${holiday}` });
+  }
+  const conflictCheck = await query(
+    `SELECT id FROM assignments WHERE substitute_id = $1 AND assignment_date = $2 AND status NOT IN ('cancelled')`,
+    [sub.id, absence.absence_date]
+  );
+  if (conflictCheck.rows.length > 0) {
+    throw new ConflictError('כבר יש לך שיבוץ לתאריך זה.', { source: 'POST /api/assignments/self-assign', detail: `Conflict on ${absence.absence_date}` });
+  }
+  const managerResult = await query(
+    `SELECT id FROM users WHERE authority_id = $1 AND role IN ('authority_admin', 'manager') LIMIT 1`,
+    [sub.authority_id]
+  );
+  const assignedBy = managerResult.rows[0]?.id || req.user!.id;
+  const result = await query(`
+    INSERT INTO assignments (absence_id, substitute_id, kindergarten_id, assigned_by, assignment_date, start_time, end_time, status, substitute_confirmed_at)
+    VALUES ($1, $2, $3, $4, $5, '07:30', '14:00', 'confirmed', NOW()) RETURNING *
+  `, [absence.id, sub.id, absence.kindergarten_id, assignedBy, absence.absence_date]);
+  await query(`UPDATE absence_reports SET status = 'assigned' WHERE id = $1`, [absence.id]);
+  await query(`UPDATE substitutes SET total_assignments = total_assignments + 1 WHERE id = $1`, [sub.id]);
+  // Notify managers
+  const managers = await query(
+    `SELECT id FROM users WHERE authority_id = $1 AND role IN ('manager', 'authority_admin')`,
+    [sub.authority_id]
+  );
+  const kgName = await query('SELECT name FROM kindergartens WHERE id = $1', [absence.kindergarten_id]);
+  const subName = await query('SELECT first_name, last_name FROM users WHERE id = $1', [req.user!.id]);
+  for (const manager of managers.rows) {
+    await query(`INSERT INTO notifications (user_id, type, title, message, data) VALUES ($1, 'assignment_request', 'מחליפה נרשמה לפוזיציה', $2, $3)`, [
+      manager.id,
+      `${subName.rows[0]?.first_name} ${subName.rows[0]?.last_name} נרשמה לגן ${kgName.rows[0]?.name} בתאריך ${absence.absence_date}`,
+      JSON.stringify({ assignmentId: result.rows[0].id }),
+    ]);
+  }
+  return res.status(201).json(result.rows[0]);
+}));
+
 // PATCH /api/assignments/:id/confirm
 router.patch('/:id/confirm', requireRole('substitute'), asyncHandler(async (req: AuthRequest, res: Response) => {
   const subResult = await query('SELECT id FROM substitutes WHERE user_id = $1', [req.user!.id]);

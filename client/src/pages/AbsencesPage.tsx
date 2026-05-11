@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Search, Plus, X, Calendar, MapPin, User, Filter,
-  AlertTriangle, Clock, CheckCircle, Loader2,
+  AlertTriangle, Clock, CheckCircle, Loader2, Sparkles, Phone,
 } from 'lucide-react';
 import api, { handleApiError } from '@/utils/api';
 import { useAuthStore } from '@/context/authStore';
 import { DEMO_ABSENCES, DEMO_KINDERGARTENS } from '@/utils/demoData';
 import toast from 'react-hot-toast';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
 
 // ─── Types ───────────────────────────────────────────────────
@@ -55,6 +55,14 @@ const statusConfig: Record<string, { label: string; cls: string; icon: typeof Ch
 };
 
 // ─── Main Component ───────────────────────────────────────────
+interface Recommendation {
+  substituteId: string;
+  userId: string;
+  fullName: string;
+  score: number;
+  reasons: string[];
+}
+
 export default function AbsencesPage() {
   const queryClient = useQueryClient();
   const { isDemoMode } = useAuthStore();
@@ -62,6 +70,7 @@ export default function AbsencesPage() {
   const [filterStatus, setFilterStatus] = useState('');
   const [filterReason, setFilterReason] = useState('');
   const [showCreate, setShowCreate] = useState(false);
+  const [assignModal, setAssignModal] = useState<{ absenceId: string; kindergartenId: string; kindergartenName: string; date: string } | null>(null);
 
   const { data: absences = [], isLoading, isError } = useQuery<AbsenceReport[]>({
     queryKey: ['absences'],
@@ -86,6 +95,17 @@ export default function AbsencesPage() {
       toast.success('סטטוס עודכן');
     },
     onError: (err) => handleApiError(err, 'PATCH /api/absences/:id'),
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: ({ substituteId, kindergartenId, absenceId, date }: { substituteId: string; kindergartenId: string; absenceId: string; date: string }) =>
+      api.post('/assignments', { substituteId, kindergartenId, absenceId, assignmentDate: date }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['absences'] });
+      toast.success('המחליפה שובצה בהצלחה!');
+      setAssignModal(null);
+    },
+    onError: (err) => handleApiError(err, 'POST /api/assignments'),
   });
 
   const filtered = absences.filter(a => {
@@ -229,7 +249,14 @@ export default function AbsencesPage() {
 
                   {/* Actions */}
                   {a.status === 'open' && (
-                    <div className="flex gap-2 flex-shrink-0">
+                    <div className="flex gap-2 flex-shrink-0 flex-wrap justify-end">
+                      <button
+                        onClick={() => setAssignModal({ absenceId: a.id, kindergartenId: a.kindergarten_id, kindergartenName: a.kindergarten_name, date: a.absence_date })}
+                        className="text-xs px-3 py-1.5 rounded-lg bg-mint-500 text-white hover:bg-mint-600 border border-mint-500 transition-colors font-medium flex items-center gap-1"
+                      >
+                        <Sparkles size={12} />
+                        שבצי מחליפה
+                      </button>
                       <button
                         onClick={() => updateStatusMutation.mutate({ id: a.id, status: 'uncovered' })}
                         disabled={updateStatusMutation.isPending}
@@ -278,6 +305,19 @@ export default function AbsencesPage() {
             setShowCreate(false);
             queryClient.invalidateQueries({ queryKey: ['absences'] });
           }}
+        />
+      )}
+
+      {/* Assign Modal */}
+      {assignModal && (
+        <AbsenceAssignModal
+          absenceId={assignModal.absenceId}
+          kindergartenId={assignModal.kindergartenId}
+          kindergartenName={assignModal.kindergartenName}
+          date={assignModal.date}
+          submitting={assignMutation.isPending}
+          onClose={() => setAssignModal(null)}
+          onAssign={(substituteId) => assignMutation.mutate({ substituteId, kindergartenId: assignModal.kindergartenId, absenceId: assignModal.absenceId, date: assignModal.date })}
         />
       )}
     </div>
@@ -433,6 +473,155 @@ function CreateAbsenceModal({
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+// ─── Absence Assign Modal ─────────────────────────────────────
+function AbsenceAssignModal({
+  absenceId,
+  kindergartenId,
+  kindergartenName,
+  date,
+  submitting,
+  onClose,
+  onAssign,
+}: {
+  absenceId: string;
+  kindergartenId: string;
+  kindergartenName: string;
+  date: string;
+  submitting: boolean;
+  onClose: () => void;
+  onAssign: (substituteId: string) => void;
+}) {
+  const { isDemoMode } = useAuthStore();
+  const [selectedSub, setSelectedSub] = useState('');
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const { data, isLoading } = useQuery<{ count: number; recommendations: Recommendation[] }>({
+    queryKey: ['ml-recommend', kindergartenId, date],
+    queryFn: () =>
+      api.get('/ml/recommend', { params: { kindergartenId, date, topK: 20 } })
+        .then(r => r.data)
+        .catch(() => isDemoMode ? {
+          count: 3,
+          recommendations: [
+            { substituteId: 'sub-1', userId: 'u1', fullName: 'מרים אברהם', score: 0.92, reasons: ['זמינה', 'מרחק קרוב', 'דירוג גבוה'] },
+            { substituteId: 'sub-2', userId: 'u2', fullName: 'רחל לוי', score: 0.85, reasons: ['זמינה', 'ניסיון רב'] },
+            { substituteId: 'sub-3', userId: 'u3', fullName: 'שרה כהן', score: 0.78, reasons: ['זמינה'] },
+          ],
+        } : null),
+  });
+
+  const recs = data?.recommendations ?? [];
+  const selectedRec = recs.find(r => r.substituteId === selectedSub);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      {!showConfirm ? (
+        <div className="card p-6 w-full max-w-lg slide-in max-h-[90vh] overflow-y-auto">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold text-navy-900 text-lg">שיבוץ מחליפה</h3>
+            <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-lg">
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className="bg-navy-900 rounded-xl p-4 mb-4 text-white">
+            <p className="text-mint-400 text-xs font-medium">גן ילדים</p>
+            <p className="font-bold text-lg">{kindergartenName}</p>
+            <p className="text-navy-300 text-sm mt-1">
+              {format(parseISO(date), 'EEEE, d בMMMM yyyy', { locale: he })}
+            </p>
+          </div>
+
+          <div>
+            <label className="text-sm font-semibold text-navy-900 mb-2 flex items-center gap-1.5">
+              <Sparkles size={14} className="text-mint-500" />
+              המלצות חכמות ({recs.length})
+            </label>
+            {isLoading ? (
+              <div className="text-center py-6 text-sm text-slate-500 flex items-center justify-center gap-2">
+                <Loader2 size={14} className="animate-spin" />טוען...
+              </div>
+            ) : recs.length > 0 ? (
+              <div className="space-y-1.5 max-h-72 overflow-y-auto">
+                {recs.map((r, idx) => {
+                  const initials = r.fullName.split(' ').map(s => s[0]).slice(0, 2).join('');
+                  return (
+                    <label
+                      key={r.substituteId}
+                      className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors border ${
+                        selectedSub === r.substituteId ? 'bg-mint-50 border-mint-300' : 'border-slate-100 hover:bg-slate-50'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="substitute"
+                        value={r.substituteId}
+                        checked={selectedSub === r.substituteId}
+                        onChange={() => setSelectedSub(r.substituteId)}
+                        className="accent-mint-500 mt-1"
+                      />
+                      <div className="w-8 h-8 rounded-full bg-navy-900 flex items-center justify-center text-xs font-bold text-mint-400 flex-shrink-0">
+                        {initials}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-navy-900 truncate">{r.fullName}</p>
+                          <span className="text-[10px] font-bold bg-mint-100 text-mint-700 px-2 py-0.5 rounded-full whitespace-nowrap">
+                            {idx === 0 && '⭐ '}{Math.round(r.score * 100)}%
+                          </span>
+                        </div>
+                        {r.reasons.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {r.reasons.map(reason => (
+                              <span key={reason} className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">{reason}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-6 border border-slate-200 rounded-xl">
+                <AlertTriangle size={24} className="text-amber-400 mx-auto mb-2" />
+                <p className="text-sm text-slate-500 font-medium">אין מחליפות זמינות ליום זה</p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-2 mt-5">
+            <button
+              onClick={() => selectedSub && setShowConfirm(true)}
+              disabled={!selectedSub || submitting}
+              className="btn-primary flex-1 disabled:opacity-50"
+            >
+              שבצי מחליפה
+            </button>
+            <button onClick={onClose} className="btn-secondary">ביטול</button>
+          </div>
+        </div>
+      ) : (
+        <div className="card p-6 w-full max-w-sm slide-in text-center">
+          <div className="w-14 h-14 rounded-full bg-mint-100 flex items-center justify-center mx-auto mb-4">
+            <CheckCircle size={28} className="text-mint-500" />
+          </div>
+          <h3 className="font-bold text-navy-900 text-lg mb-2">אישור שיבוץ</h3>
+          <p className="text-slate-600 text-sm mb-1">לשבץ את <span className="font-bold text-navy-900">{selectedRec?.fullName}</span></p>
+          <p className="text-slate-600 text-sm mb-1">ל<span className="font-bold text-navy-900">{kindergartenName}</span></p>
+          <p className="text-slate-500 text-xs mb-5">{format(parseISO(date), 'EEEE, d בMMMM yyyy', { locale: he })}</p>
+          <div className="flex gap-2">
+            <button onClick={() => onAssign(selectedSub)} disabled={submitting} className="btn-primary flex-1 disabled:opacity-50">
+              {submitting ? 'שולח...' : 'אישור'}
+            </button>
+            <button onClick={() => setShowConfirm(false)} className="btn-secondary flex-1">חזרה</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

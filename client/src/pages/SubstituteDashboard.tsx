@@ -2,12 +2,12 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle, XCircle, Calendar, MapPin, Clock,
-  ChevronRight, ChevronLeft, Camera, Edit3, List, LayoutGrid, Save, X,
+  ChevronRight, ChevronLeft, Camera, Edit3, List, LayoutGrid, Save, X, Sparkles,
 } from 'lucide-react';
 import api, { handleApiError } from '@/utils/api';
 import { useAuthStore } from '@/context/authStore';
 import {
-  DEMO_ASSIGNMENTS, DEMO_AVAILABILITY, DEMO_SUB_PROFILE,
+  DEMO_ASSIGNMENTS, DEMO_AVAILABILITY, DEMO_SUB_PROFILE, DEMO_OPEN_POSITIONS,
 } from '@/utils/demoData';
 import toast from 'react-hot-toast';
 import { format, parseISO, startOfWeek, addDays, addWeeks, addMonths, subWeeks, subMonths, isSameDay, isSameMonth } from 'date-fns';
@@ -23,6 +23,17 @@ interface Assignment {
   kindergarten_address: string;
   neighborhood: string;
   status: string;
+}
+
+interface OpenPosition {
+  id: string;
+  absence_date: string;
+  kindergarten_name: string;
+  kindergarten_address: string;
+  neighborhood: string;
+  absent_employee_name: string;
+  absent_employee_role: string;
+  absence_reason: string | null;
 }
 
 
@@ -164,6 +175,28 @@ export default function SubstituteDashboard() {
     },
     onError: () => toast.error('שגיאה בביטול השיבוץ'),
   });
+
+  // Open positions query
+  const { data: openPositions = [] } = useQuery<OpenPosition[]>({
+    queryKey: ['open-positions'],
+    queryFn: () => api.get('/absences/open').then(r => r.data)
+      .catch(() => isDemoMode ? DEMO_OPEN_POSITIONS as OpenPosition[] : []),
+  });
+
+  // Self-assign mutation
+  const selfAssign = useMutation({
+    mutationFn: (absenceId: string) => api.post('/assignments/self-assign', { absenceId }),
+    onSuccess: () => {
+      toast.success('נרשמת לשיבוץ בהצלחה!');
+      queryClient.invalidateQueries({ queryKey: ['sub-assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['open-positions'] });
+    },
+    onError: (err) => handleApiError(err, 'self-assign'),
+  });
+
+  // Cancel with reason modal state
+  const [cancelModal, setCancelModal] = useState<{ id: string } | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
 
   const permitOk = p?.work_permit_valid &&
     new Date(p.work_permit_expiry) > new Date();
@@ -322,7 +355,7 @@ export default function SubstituteDashboard() {
                     אני מגיעה ✓
                   </button>
                   <button
-                    onClick={() => toast.error('פנה/י למדריכה לביטול')}
+                    onClick={() => { setCancelReason(''); setCancelModal({ id: selectedDayAsgn.id }); }}
                     className="btn-secondary flex items-center justify-center gap-2 py-4 text-base text-red-500 border-red-200"
                   >
                     <XCircle size={20} />
@@ -330,11 +363,19 @@ export default function SubstituteDashboard() {
                   </button>
                 </div>
               )}
-
               {selectedDayAsgn.status === 'confirmed' && (
-                <div className="bg-mint-100 rounded-xl p-4 text-center">
-                  <CheckCircle size={24} className="text-mint-500 mx-auto mb-2" />
-                  <p className="text-mint-700 font-semibold">השיבוץ אושר</p>
+                <div className="space-y-3">
+                  <div className="bg-mint-100 rounded-xl p-4 text-center">
+                    <CheckCircle size={24} className="text-mint-500 mx-auto mb-2" />
+                    <p className="text-mint-700 font-semibold">השיבוץ אושר</p>
+                  </div>
+                  <button
+                    onClick={() => { setCancelReason(''); setCancelModal({ id: selectedDayAsgn.id }); }}
+                    className="btn-secondary flex items-center justify-center gap-1.5 py-2.5 text-sm text-red-500 border-red-200 w-full"
+                  >
+                    <XCircle size={16} />
+                    ביטול שיבוץ
+                  </button>
                 </div>
               )}
             </div>
@@ -602,7 +643,66 @@ export default function SubstituteDashboard() {
             </div>
           </div>
 
-          {/* Stats (without rating and experience) */}
+          {/* Open Positions Panel */}
+          <div className="card p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles size={16} className="text-mint-500" />
+              <h3 className="font-bold text-navy-900">פוזיציות פתוחות</h3>
+              {openPositions.length > 0 && (
+                <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">{openPositions.length}</span>
+              )}
+            </div>
+            {openPositions.length === 0 ? (
+              <div className="text-center py-5 text-slate-400 text-sm">
+                <CheckCircle size={24} className="mx-auto mb-2 text-mint-300" />
+                אין פוזיציות פתוחות כרגע
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {openPositions.map(pos => {
+                  const day = parseISO(pos.absence_date);
+                  const alreadyAssigned = allAssignments.some(a => a.assignment_date === pos.absence_date);
+                  return (
+                    <div
+                      key={pos.id}
+                      className="rounded-xl border border-amber-200 bg-amber-50 p-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-navy-900">{pos.kindergarten_name}</p>
+                          <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
+                            <Calendar size={11} />
+                            {format(day, 'EEEE d/M', { locale: he })}
+                          </p>
+                          <p className="text-xs text-slate-500 flex items-center gap-1">
+                            <MapPin size={11} />
+                            {pos.kindergarten_address}
+                          </p>
+                        </div>
+                        {alreadyAssigned ? (
+                          <span className="text-xs bg-mint-100 text-mint-700 px-2 py-1 rounded-lg font-medium whitespace-nowrap">כבר שובצת</span>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`להירשם לשיבוץ ב${pos.kindergarten_name} בתאריך ${format(day, 'd/M', { locale: he })}?`)) {
+                                selfAssign.mutate(pos.id);
+                              }
+                            }}
+                            disabled={selfAssign.isPending}
+                            className="btn-primary text-xs py-1.5 px-3 whitespace-nowrap flex-shrink-0"
+                          >
+                            אני לוקחת!
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Stats */}
           <button
             onClick={() => { setViewMode('list'); }}
             className="card p-4 text-center w-full hover:bg-slate-50 transition-all cursor-pointer"
@@ -783,6 +883,52 @@ export default function SubstituteDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Cancel Assignment Modal */}
+      {cancelModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="card p-6 w-full max-w-sm slide-in">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-navy-900 text-lg">ביטול שיבוץ</h3>
+              <button onClick={() => setCancelModal(null)} className="p-1 hover:bg-slate-100 rounded-lg">
+                <X size={18} />
+              </button>
+            </div>
+            <p className="text-slate-600 text-sm mb-4">מה הסיבה לביטול?</p>
+            <div className="space-y-2 mb-4">
+              {['מחלה', 'חירום משפחתי', 'בעיית תחבורה', 'סיבה אחרת'].map(reason => (
+                <label key={reason} className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer border transition-colors ${
+                  cancelReason === reason ? 'bg-red-50 border-red-300' : 'border-slate-100 hover:bg-slate-50'
+                }`}>
+                  <input
+                    type="radio"
+                    name="cancelReason"
+                    value={reason}
+                    checked={cancelReason === reason}
+                    onChange={() => setCancelReason(reason)}
+                    className="accent-red-500"
+                  />
+                  <span className="text-sm font-medium text-navy-900">{reason}</span>
+                </label>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  if (!cancelReason) { toast.error('יש לבחור סיבה לביטול'); return; }
+                  cancelAssignment.mutate({ id: cancelModal.id, reason: cancelReason });
+                  setCancelModal(null);
+                }}
+                disabled={cancelAssignment.isPending || !cancelReason}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-semibold text-sm hover:bg-red-600 disabled:opacity-50"
+              >
+                אשרי ביטול
+              </button>
+              <button onClick={() => setCancelModal(null)} className="btn-secondary flex-1">חזרה</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
