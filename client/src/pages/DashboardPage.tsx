@@ -14,7 +14,7 @@ import {
 import { he } from 'date-fns/locale';
 import { isHoliday } from '@/utils/holidays';
 import {
-  DEMO_KINDERGARTENS, DEMO_ABSENCES, DEMO_ASSIGNMENTS,
+  DEMO_KINDERGARTENS, DEMO_ABSENCES, DEMO_ASSIGNMENTS, DEMO_ML_RECOMMENDATIONS,
 } from '@/utils/demoData';
 
 // ─── Types ──────────────────────────────────────────────────
@@ -619,10 +619,8 @@ function AssignModal({
 }) {
   const [selectedSub, setSelectedSub] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
+  const { isDemoMode } = useAuthStore();
 
-  // ML-powered recommendations: filtered for permit/active/conflict and
-  // ranked by match probability. Cold-starts gracefully when no model
-  // is trained yet.
   const { data, isLoading } = useQuery<{
     count: number;
     recommendations: Recommendation[];
@@ -631,7 +629,7 @@ function AssignModal({
     queryFn: () =>
       api.get('/ml/recommend', { params: { kindergartenId, date, topK: 20 } })
         .then(r => r.data)
-        .catch(() => null),
+        .catch(() => isDemoMode ? DEMO_ML_RECOMMENDATIONS : null),
   });
 
   const recs = data?.recommendations ?? [];

@@ -28,7 +28,7 @@ export const DEMO_SUBSTITUTES = [
 
 // ─── Absence reports ─────────────────────────────────────────
 export const DEMO_ABSENCES = [
-  // Today — one open, one assigned
+  // Today — 3 open holes + 1 assigned (shows urgency in manager dashboard)
   {
     id: 'abs-1', kindergarten_id: 'kg-1', kindergarten_name: 'גן חבצלת',
     kindergarten_address: 'רחוב הרצל 15', absent_employee_name: 'יעל כהן',
@@ -41,12 +41,30 @@ export const DEMO_ABSENCES = [
     absent_employee_role: 'assistant', absence_date: d(0), absence_reason: 'vacation',
     status: 'assigned', notes: null, created_at: new Date().toISOString(),
   },
-  // Tomorrow — open
+  {
+    id: 'abs-7', kindergarten_id: 'kg-2', kindergarten_name: 'גן נרקיס',
+    kindergarten_address: 'רחוב ויצמן 8', absent_employee_name: 'תמר שלום',
+    absent_employee_role: 'teacher', absence_date: d(0), absence_reason: 'sick',
+    status: 'open', notes: null, created_at: new Date().toISOString(),
+  },
+  {
+    id: 'abs-8', kindergarten_id: 'kg-5', kindergarten_name: 'גן דליה',
+    kindergarten_address: 'רחוב ז׳בוטינסקי 11', absent_employee_name: 'דינה פרץ',
+    absent_employee_role: 'teacher', absence_date: d(0), absence_reason: 'emergency',
+    status: 'open', notes: 'חירום משפחתי', created_at: new Date().toISOString(),
+  },
+  // Tomorrow — 2 open
   {
     id: 'abs-3', kindergarten_id: 'kg-2', kindergarten_name: 'גן נרקיס',
     kindergarten_address: 'רחוב ויצמן 8', absent_employee_name: 'תמר שלום',
     absent_employee_role: 'teacher', absence_date: d(1), absence_reason: 'known',
     status: 'open', notes: 'אירוע משפחתי', created_at: new Date().toISOString(),
+  },
+  {
+    id: 'abs-9', kindergarten_id: 'kg-4', kindergarten_name: 'גן כלנית',
+    kindergarten_address: 'רחוב סוקולוב 3', absent_employee_name: 'מיכל לוי',
+    absent_employee_role: 'assistant', absence_date: d(1), absence_reason: 'sick',
+    status: 'open', notes: null, created_at: new Date().toISOString(),
   },
   // Day after tomorrow — open
   {
@@ -119,16 +137,47 @@ export const DEMO_ASSIGNMENTS = [
 
 // ─── Dashboard stats ──────────────────────────────────────────
 export const DEMO_DASHBOARD_STATS = {
-  totalSubstitutes: 3,
+  totalSubstitutes: 5,
   todayCovered: 1,
-  todayTotal: 2,
-  openAbsences: 1,
-  expiringPermits: 0,
+  todayTotal: 4,
+  openAbsences: 3,
+  expiringPermits: 1,
   weekCoverage: Array.from({ length: 6 }, (_, i) => ({
     date: d(i),
-    assignments: [1, 2, 0, 1, 0, 2][i],
-    open_absences: [1, 1, 2, 0, 1, 0][i],
+    assignments: [1, 2, 1, 2, 0, 1][i],
+    open_absences: [3, 2, 1, 0, 1, 0][i],
   })),
+};
+
+// ─── ML Recommendations (demo fallback for assign modal) ─────
+export const DEMO_ML_RECOMMENDATIONS = {
+  count: 4,
+  recommendations: [
+    {
+      substituteId: 'sub-3', userId: 'u3', fullName: 'שרה כהן',
+      score: 0.94,
+      reasons: ['✅ זמינה', '📍 מרחק 1.2 ק"מ', '⭐ דירוג 4.9', '🔄 31 שיבוצים'],
+      features: { availability: 1, distance: 0.92, rating: 0.98, experience: 0.95 },
+    },
+    {
+      substituteId: 'sub-1', userId: 'u1', fullName: 'מרים אברהם',
+      score: 0.87,
+      reasons: ['✅ זמינה', '⭐ דירוג 4.8', '🔄 24 שיבוצים', '📍 מרחק 2.1 ק"מ'],
+      features: { availability: 1, distance: 0.78, rating: 0.96, experience: 0.85 },
+    },
+    {
+      substituteId: 'sub-2', userId: 'u2', fullName: 'רחל לוי',
+      score: 0.76,
+      reasons: ['✅ זמינה', '📍 מרחק 0.8 ק"מ', '⭐ דירוג 4.5'],
+      features: { availability: 1, distance: 0.96, rating: 0.90, experience: 0.72 },
+    },
+    {
+      substituteId: 'sub-5', userId: 'u5', fullName: 'נועה פרידמן',
+      score: 0.61,
+      reasons: ['✅ זמינה', '📍 מרחק 3.5 ק"מ', '🆕 מחליפה חדשה'],
+      features: { availability: 1, distance: 0.65, rating: 0, experience: 0.30 },
+    },
+  ],
 };
 
 // ─── Activity feed ────────────────────────────────────────────

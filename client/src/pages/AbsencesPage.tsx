@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import api, { handleApiError } from '@/utils/api';
 import { useAuthStore } from '@/context/authStore';
-import { DEMO_ABSENCES, DEMO_KINDERGARTENS } from '@/utils/demoData';
+import { DEMO_ABSENCES, DEMO_KINDERGARTENS, DEMO_ML_RECOMMENDATIONS } from '@/utils/demoData';
 import toast from 'react-hot-toast';
 import { format, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -504,14 +504,7 @@ function AbsenceAssignModal({
     queryFn: () =>
       api.get('/ml/recommend', { params: { kindergartenId, date, topK: 20 } })
         .then(r => r.data)
-        .catch(() => isDemoMode ? {
-          count: 3,
-          recommendations: [
-            { substituteId: 'sub-1', userId: 'u1', fullName: 'מרים אברהם', score: 0.92, reasons: ['זמינה', 'מרחק קרוב', 'דירוג גבוה'] },
-            { substituteId: 'sub-2', userId: 'u2', fullName: 'רחל לוי', score: 0.85, reasons: ['זמינה', 'ניסיון רב'] },
-            { substituteId: 'sub-3', userId: 'u3', fullName: 'שרה כהן', score: 0.78, reasons: ['זמינה'] },
-          ],
-        } : null),
+        .catch(() => isDemoMode ? DEMO_ML_RECOMMENDATIONS : null),
   });
 
   const recs = data?.recommendations ?? [];

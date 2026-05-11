@@ -5,11 +5,15 @@ import { asyncHandler } from '../middleware/asyncHandler';
 import { ValidationError, NotFoundError, ConflictError } from '../errors/AppError';
 import { sendEmail } from '../utils/mailer';
 
-// D2: Israeli public holidays (fixed dates, format MM-DD)
+// D2: Israeli public holidays for 5786 (2025-2026 school year), format MM-DD
 const IL_HOLIDAYS: Record<string, string> = {
-  '09-22': 'ראש השנה', '09-24': 'ראש השנה', '10-01': 'יום כיפור',
-  '10-06': 'סוכות', '10-13': 'שמיני עצרת', '04-14': 'פסח', '04-21': 'אחרון של פסח',
-  '05-14': 'יום העצמאות', '06-02': 'שבועות',
+  '09-22': 'ראש השנה', '09-24': 'ראש השנה',
+  '10-01': 'יום כיפור',
+  '10-06': 'סוכות', '10-13': 'שמיני עצרת',
+  '04-01': 'ערב פסח', '04-02': 'פסח', '04-09': 'שביעי של פסח', '04-10': 'אסרו חג פסח',
+  '04-21': 'יום הזיכרון', '04-22': 'יום העצמאות',
+  '05-05': 'ל"ג בעומר',
+  '05-22': 'שבועות', '05-23': 'שבועות',
 };
 function getHolidayName(dateStr: string): string | null {
   const monthDay = dateStr.substring(5); // MM-DD

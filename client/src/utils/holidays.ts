@@ -22,16 +22,16 @@ export const HOLIDAYS_2025_2026: Holiday[] = [
   { name: 'ט"ו בשבט', start: '2026-02-09', end: '2026-02-09' },
   // פורים - Purim
   { name: 'פורים', start: '2026-03-03', end: '2026-03-04' },
-  // פסח - Passover
-  { name: 'פסח', start: '2026-03-21', end: '2026-04-01' },
-  // יום הזיכרון - Memorial Day
+  // פסח - Passover (15 Nisan 5786 = 2 April 2026; school break from Erev Passover)
+  { name: 'פסח', start: '2026-04-01', end: '2026-04-10' },
+  // יום הזיכרון - Memorial Day (4 Iyar 5786)
   { name: 'יום הזיכרון', start: '2026-04-21', end: '2026-04-21' },
-  // יום העצמאות - Independence Day
+  // יום העצמאות - Independence Day (5 Iyar 5786)
   { name: 'יום העצמאות', start: '2026-04-22', end: '2026-04-22' },
-  // ל"ג בעומר - Lag BaOmer
-  { name: 'ל"ג בעומר', start: '2026-05-12', end: '2026-05-12' },
-  // שבועות - Shavuot
-  { name: 'שבועות', start: '2026-05-31', end: '2026-06-01' },
+  // ל"ג בעומר - Lag BaOmer (18 Iyar 5786 = 5 May 2026)
+  { name: 'ל"ג בעומר', start: '2026-05-05', end: '2026-05-05' },
+  // שבועות - Shavuot (6 Sivan 5786 = 22 May 2026)
+  { name: 'שבועות', start: '2026-05-22', end: '2026-05-23' },
   // חופשת קיץ - Summer vacation
   { name: 'חופשת קיץ', start: '2026-06-21', end: '2026-08-31' },
 ];
