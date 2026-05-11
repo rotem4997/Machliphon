@@ -337,10 +337,11 @@ router.patch('/:id/substitute-cancel', requireRole('substitute'), asyncHandler(a
   const kgId = result.rows[0].kindergarten_id;
   const admins = await query(`SELECT u.id FROM users u JOIN kindergartens k ON u.authority_id = k.authority_id WHERE k.id = $1 AND u.role IN ('manager','authority_admin')`, [kgId]);
   const kgRes = await query('SELECT name FROM kindergartens WHERE id = $1', [kgId]);
-  const subName = `${result.rows[0].substitute_id}`;
+  const subNameRes = await query('SELECT first_name, last_name FROM users WHERE id = $1', [req.user!.id]);
+  const subName = subNameRes.rows[0] ? `${subNameRes.rows[0].first_name} ${subNameRes.rows[0].last_name}` : 'מחליפה';
   for (const adm of admins.rows) {
     await query(`INSERT INTO notifications (user_id, type, title, message, data) VALUES ($1,'assignment_cancelled','שיבוץ בוטל על ידי מחליפה',$2,$3)`,
-      [adm.id, `שיבוץ ל${kgRes.rows[0]?.name || 'גן'} בוטל. סיבה: ${reason || 'ללא סיבה'}.`, JSON.stringify({ assignmentId: req.params.id })]);
+      [adm.id, `${subName} ביטלה שיבוץ ל${kgRes.rows[0]?.name || 'גן'}. סיבה: ${reason || 'ללא סיבה'}.`, JSON.stringify({ assignmentId: req.params.id })]);
   }
   return res.json({ message: 'ביטול בוצע.' });
 }));

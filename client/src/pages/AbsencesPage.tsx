@@ -240,7 +240,7 @@ export default function AbsencesPage() {
                       </span>
                       <span className="flex items-center gap-1">
                         <Calendar size={12} />
-                        {format(new Date(a.absence_date), 'EEEE d/M/yyyy', { locale: he })}
+                        {format(parseISO(a.absence_date), 'EEEE d/M/yyyy', { locale: he })}
                       </span>
                     </div>
 
