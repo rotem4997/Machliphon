@@ -118,7 +118,7 @@ router.post('/', requireMadriga, async (req: Request, res: Response, next: NextF
       const smsPromises = substitutes
         .filter((sub) => {
           // No row means available by default
-          const available = availMap.has(sub.id) ? availMap.get(sub.id) : true;
+          const available = availMap.has(sub.id) ? availMap.get(sub.id)! : true;
           return available === true;
         })
         .map((sub) =>

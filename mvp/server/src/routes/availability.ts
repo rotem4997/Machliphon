@@ -150,7 +150,7 @@ router.get(
         full_name: sub.full_name,
         phone: sub.phone,
         // No row → available by default
-        is_available: availMap.has(sub.id) ? availMap.get(sub.id) : true,
+        is_available: availMap.has(sub.id) ? availMap.get(sub.id)! : true,
       }));
 
       res.json(result);

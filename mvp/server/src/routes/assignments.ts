@@ -209,7 +209,7 @@ router.delete(
 
         const smsPromises = substitutes
           .filter((sub) => {
-            const available = availMap.has(sub.id) ? availMap.get(sub.id) : true;
+            const available = availMap.has(sub.id) ? availMap.get(sub.id)! : true;
             return available === true;
           })
           .map((sub) =>
