@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: machliphon-mvp-server
+    runtime: node
+    rootDir: mvp/server
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: CLIENT_URL
+        sync: false
+      - key: PORT
+        value: 3001
