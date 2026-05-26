@@ -1,11 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 
-/**
- * Wraps an async route handler so that thrown/rejected errors
- * are forwarded to the Express error-handling middleware automatically.
- */
-export const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) => {
+export const asyncHandler = <TReq extends Request = Request>(
+  fn: (req: TReq, res: Response, next: NextFunction) => Promise<any>
+) => {
   return (req: Request, res: Response, next: NextFunction) => {
-    Promise.resolve(fn(req, res, next)).catch(next);
+    Promise.resolve(fn(req as TReq, res, next)).catch(next);
   };
 };
