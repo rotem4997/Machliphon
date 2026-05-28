@@ -173,3 +173,9 @@ api.interceptors.response.use(
 );
 
 export default api;
+
+export const getSettings = (): Promise<Record<string, boolean>> =>
+  api.get('/settings').then((r) => r.data.preferences ?? r.data);
+
+export const updateSettings = (prefs: Record<string, boolean>): Promise<Record<string, boolean>> =>
+  api.patch('/settings', prefs).then((r) => r.data.preferences ?? r.data);

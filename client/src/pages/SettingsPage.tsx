@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Settings, Bell, Shield, Globe, Database, ChevronLeft, CheckCircle } from 'lucide-react';
 import { useAuthStore } from '@/context/authStore';
 import toast from 'react-hot-toast';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getSettings, updateSettings } from '@/utils/api';
 
 interface SettingRow {
   label: string;
@@ -20,6 +22,24 @@ const systemSettings: SettingRow[] = [
   { label: 'שפת ממשק עברית', description: 'הצג את הממשק בעברית (RTL)', defaultValue: true },
   { label: 'מצב נגישות', description: 'הגדל גופנים ושפר ניגוד צבעים', defaultValue: false },
 ];
+
+const PREF_KEYS: Record<string, string> = {
+  'התראה על היעדרות חדשה': 'notif_new_absence',
+  'התראה על שיבוץ שאושר': 'notif_assignment_confirmed',
+  'תזכורת בוקר': 'notif_morning_summary',
+  'התראה על ביטול שיבוץ': 'notif_assignment_cancelled',
+  'שפת ממשק עברית': 'lang_hebrew',
+  'מצב נגישות': 'accessibility_mode',
+};
+
+const PREF_DEFAULTS: Record<string, boolean> = {
+  notif_new_absence: true,
+  notif_assignment_confirmed: true,
+  notif_morning_summary: false,
+  notif_assignment_cancelled: true,
+  lang_hebrew: true,
+  accessibility_mode: false,
+};
 
 function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -77,21 +97,55 @@ function SettingSection({
 export default function SettingsPage() {
   const { user, isDemoMode } = useAuthStore();
 
-  const buildInitial = (rows: SettingRow[]) =>
-    Object.fromEntries(rows.map(r => [r.label, r.defaultValue]));
+  const queryClient = useQueryClient();
 
-  const [notifValues, setNotifValues] = useState(buildInitial(notificationSettings));
-  const [sysValues, setSysValues] = useState(buildInitial(systemSettings));
+  const { data: savedPrefs, isLoading } = useQuery({
+    queryKey: ['settings'],
+    queryFn: getSettings,
+    enabled: !isDemoMode,
+  });
+
+  const mutation = useMutation({
+    mutationFn: updateSettings,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['settings'] });
+      toast.success('הגדרות נשמרו');
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    },
+    onError: () => toast.error('שגיאה בשמירת ההגדרות'),
+  });
+
+  const buildFromPrefs = (rows: SettingRow[]) =>
+    Object.fromEntries(
+      rows.map(r => [r.label, savedPrefs?.[PREF_KEYS[r.label]] ?? r.defaultValue])
+    );
+
+  const [notifValues, setNotifValues] = useState<Record<string, boolean>>({});
+  const [sysValues, setSysValues] = useState<Record<string, boolean>>({});
   const [saved, setSaved] = useState(false);
+
+  // Sync local state when prefs load from API
+  useEffect(() => {
+    setNotifValues(buildFromPrefs(notificationSettings));
+    setSysValues(buildFromPrefs(systemSettings));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedPrefs]);
 
   const handleSave = () => {
     if (isDemoMode) {
       toast('הגדרות נשמרו (מצב דמו — לא נשמרות בשרת)', { icon: '⚠️' });
-    } else {
-      toast.success('הגדרות נשמרו');
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+      return;
     }
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    const allPrefs: Record<string, boolean> = {};
+    [...notificationSettings, ...systemSettings].forEach(row => {
+      const key = PREF_KEYS[row.label];
+      const val = row.label in notifValues ? notifValues[row.label] : sysValues[row.label];
+      if (key) allPrefs[key] = val ?? PREF_DEFAULTS[key];
+    });
+    mutation.mutate(allPrefs);
   };
 
   const isAdmin = user?.role === 'authority_admin' || user?.role === 'super_admin';
@@ -106,85 +160,93 @@ export default function SettingsPage() {
         <p className="text-slate-500 text-sm mt-1">התאמה אישית של המערכת</p>
       </div>
 
-      {/* Authority info (admin only) */}
-      {isAdmin && (
-        <div className="card overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
-            <Database size={18} className="text-navy-600" />
-            <h2 className="font-bold text-navy-900 text-sm">פרטי הרשות</h2>
-          </div>
-          <div className="px-5 py-4 grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p className="text-xs text-slate-400 mb-0.5">שם הרשות</p>
-              <p className="font-medium text-navy-900">{user?.authorityName || '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-400 mb-0.5">תפקיד</p>
-              <p className="font-medium text-navy-900">
-                {user?.role === 'authority_admin' ? 'מנהל רשות' : 'מנהל ראשי'}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-400 mb-0.5">אימייל</p>
-              <p className="font-medium text-navy-900 dir-ltr">{user?.email}</p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-400 mb-0.5">מזהה משתמש</p>
-              <p className="font-mono text-xs text-slate-500 truncate">{user?.id}</p>
-            </div>
-          </div>
-        </div>
+      {isLoading && (
+        <div className="text-center py-8 text-slate-400 text-sm">טוען הגדרות...</div>
       )}
 
-      <SettingSection
-        title="התראות"
-        icon={<Bell size={18} />}
-        rows={notificationSettings}
-        values={notifValues}
-        onChange={(label, v) => setNotifValues(prev => ({ ...prev, [label]: v }))}
-      />
+      {!isLoading && (
+        <>
+          {/* Authority info (admin only) */}
+          {isAdmin && (
+            <div className="card overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
+                <Database size={18} className="text-navy-600" />
+                <h2 className="font-bold text-navy-900 text-sm">פרטי הרשות</h2>
+              </div>
+              <div className="px-5 py-4 grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-xs text-slate-400 mb-0.5">שם הרשות</p>
+                  <p className="font-medium text-navy-900">{user?.authorityName || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400 mb-0.5">תפקיד</p>
+                  <p className="font-medium text-navy-900">
+                    {user?.role === 'authority_admin' ? 'מנהל רשות' : 'מנהל ראשי'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400 mb-0.5">אימייל</p>
+                  <p className="font-medium text-navy-900 dir-ltr">{user?.email}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400 mb-0.5">מזהה משתמש</p>
+                  <p className="font-mono text-xs text-slate-500 truncate">{user?.id}</p>
+                </div>
+              </div>
+            </div>
+          )}
 
-      <SettingSection
-        title="מערכת"
-        icon={<Globe size={18} />}
-        rows={systemSettings}
-        values={sysValues}
-        onChange={(label, v) => setSysValues(prev => ({ ...prev, [label]: v }))}
-      />
+          <SettingSection
+            title="התראות"
+            icon={<Bell size={18} />}
+            rows={notificationSettings}
+            values={notifValues}
+            onChange={(label, v) => setNotifValues(prev => ({ ...prev, [label]: v }))}
+          />
 
-      {/* Security section */}
-      <div className="card overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
-          <Shield size={18} className="text-navy-600" />
-          <h2 className="font-bold text-navy-900 text-sm">אבטחה</h2>
-        </div>
-        <div className="px-5 py-4 space-y-3">
-          <a
-            href="/profile"
-            className="flex items-center justify-between text-sm text-navy-700 hover:text-mint-600 transition-colors"
-          >
-            <span>שינוי סיסמה</span>
-            <ChevronLeft size={16} className="text-slate-400" />
-          </a>
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-600">פרוטוקול אבטחה</span>
-            <span className="flex items-center gap-1 text-mint-600 font-medium text-xs">
-              <CheckCircle size={14} />
-              JWT + HTTPS
-            </span>
+          <SettingSection
+            title="מערכת"
+            icon={<Globe size={18} />}
+            rows={systemSettings}
+            values={sysValues}
+            onChange={(label, v) => setSysValues(prev => ({ ...prev, [label]: v }))}
+          />
+
+          {/* Security section */}
+          <div className="card overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
+              <Shield size={18} className="text-navy-600" />
+              <h2 className="font-bold text-navy-900 text-sm">אבטחה</h2>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <a
+                href="/profile"
+                className="flex items-center justify-between text-sm text-navy-700 hover:text-mint-600 transition-colors"
+              >
+                <span>שינוי סיסמה</span>
+                <ChevronLeft size={16} className="text-slate-400" />
+              </a>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-slate-600">פרוטוקול אבטחה</span>
+                <span className="flex items-center gap-1 text-mint-600 font-medium text-xs">
+                  <CheckCircle size={14} />
+                  JWT + HTTPS
+                </span>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* Save button */}
-      <div className="flex justify-end">
-        <button
-          onClick={handleSave}
-          className={`btn-primary flex items-center gap-2 transition-all ${saved ? 'bg-mint-600' : ''}`}
-        >
-          {saved ? <><CheckCircle size={16} /> נשמר!</> : 'שמור הגדרות'}
-        </button>
-      </div>
+          {/* Save button */}
+          <div className="flex justify-end">
+            <button
+              onClick={handleSave}
+              className={`btn-primary flex items-center gap-2 transition-all ${saved ? 'bg-mint-600' : ''}`}
+            >
+              {saved ? <><CheckCircle size={16} /> נשמר!</> : 'שמור הגדרות'}
+            </button>
+          </div>
+        </>
+      )}
 
       <p className="text-center text-xs text-slate-400 pb-4">
         מחליפון {new Date().getFullYear()} — גרסה 1.0.0-mvp
