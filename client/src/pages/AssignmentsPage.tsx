@@ -7,6 +7,7 @@ import {
 import api from '@/utils/api';
 import { useAuthStore } from '@/context/authStore';
 import { DEMO_ASSIGNMENTS, DEMO_KINDERGARTENS, DEMO_SUBSTITUTES } from '@/utils/demoData';
+import KindergartenCombobox from '@/components/KindergartenCombobox';
 import toast from 'react-hot-toast';
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isToday, isSameDay, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -366,8 +367,8 @@ function CreateAssignmentModal({
       toast.success('שיבוץ נוצר בהצלחה');
       onSuccess();
     },
-    onError: (err: any) => {
-      const raw = err.response?.data?.error;
+    onError: (err: unknown) => {
+      const raw = (err as { response?: { data?: { error?: unknown } } })?.response?.data?.error;
       toast.error(typeof raw === 'string' ? raw : 'שגיאה ביצירת שיבוץ');
     },
   });
@@ -403,17 +404,16 @@ function CreateAssignmentModal({
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Kindergarten select */}
+          {/* Kindergarten combobox */}
           <div>
             <label className="label">גן ילדים</label>
-            <select value={kindergartenId} onChange={e => setKindergartenId(e.target.value)} className="input" required>
-              <option value="">בחר גן...</option>
-              {kindergartens?.map(k => (
-                <option key={k.id} value={k.id}>
-                  {k.name} — {k.neighborhood} ({k.age_group})
-                </option>
-              ))}
-            </select>
+            <KindergartenCombobox
+              kindergartens={kindergartens ?? []}
+              value={kindergartenId}
+              onChange={setKindergartenId}
+              placeholder="חיפוש גן ילדים..."
+              required
+            />
           </div>
 
           {/* Available substitutes */}

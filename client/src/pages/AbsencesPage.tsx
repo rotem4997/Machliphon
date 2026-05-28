@@ -7,6 +7,7 @@ import {
 import api, { handleApiError } from '@/utils/api';
 import { useAuthStore } from '@/context/authStore';
 import { DEMO_ABSENCES, DEMO_KINDERGARTENS } from '@/utils/demoData';
+import KindergartenCombobox from '@/components/KindergartenCombobox';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -350,17 +351,13 @@ function CreateAbsenceModal({
                 טוען גנים...
               </div>
             ) : (
-              <select
+              <KindergartenCombobox
+                kindergartens={kindergartens}
                 value={kindergartenId}
-                onChange={e => setKindergartenId(e.target.value)}
-                className="input"
+                onChange={setKindergartenId}
+                placeholder="חיפוש גן ילדים..."
                 required
-              >
-                <option value="">בחר גן...</option>
-                {kindergartens.map(k => (
-                  <option key={k.id} value={k.id}>{k.name}</option>
-                ))}
-              </select>
+              />
             )}
           </div>
 

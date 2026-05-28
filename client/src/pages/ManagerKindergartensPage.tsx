@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, AlertCircle, User, Building } from 'lucide-react';
 import api from '@/utils/api';
+import KindergartenCombobox from '@/components/KindergartenCombobox';
 import { useAuthStore } from '@/context/authStore';
 import { DEMO_KINDERGARTENS } from '@/utils/demoData';
 import toast from 'react-hot-toast';
@@ -62,7 +63,10 @@ export default function ManagerKindergartensPage() {
       setForm({ managerId: '', kindergartenId: '' });
       queryClient.invalidateQueries({ queryKey: ['manager-kindergartens'] });
     },
-    onError: (err: any) => toast.error(err?.response?.data?.error || 'שגיאה בשיוך'),
+    onError: (err: unknown) => {
+      const raw = (err as { response?: { data?: { error?: unknown } } })?.response?.data?.error;
+      toast.error(typeof raw === 'string' ? raw : 'שגיאה בשיוך');
+    },
   });
 
   const removeMutation = useMutation({
@@ -172,12 +176,12 @@ export default function ManagerKindergartensPage() {
 
             <div>
               <label className="label">גן ילדים</label>
-              <select className="input" value={form.kindergartenId} onChange={e => setForm(p => ({ ...p, kindergartenId: e.target.value }))}>
-                <option value="">בחר גן...</option>
-                {kindergartens.map(kg => (
-                  <option key={kg.id} value={kg.id}>{kg.name}</option>
-                ))}
-              </select>
+              <KindergartenCombobox
+                kindergartens={kindergartens}
+                value={form.kindergartenId}
+                onChange={id => setForm(p => ({ ...p, kindergartenId: id }))}
+                placeholder="חיפוש גן ילדים..."
+              />
             </div>
 
             <div className="flex gap-2 justify-end">
