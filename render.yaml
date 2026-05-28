@@ -1,8 +1,9 @@
 services:
   - type: web
-    name: machliphon-server
+    name: machliphon
     env: node
     plan: free
+    region: frankfurt
     buildCommand: NODE_ENV=development npm install && npm run build --workspace=server
     startCommand: npm run start --workspace=server
     healthCheckPath: /health
@@ -17,12 +18,13 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: CLIENT_URL
-        value: https://machliphon-client.vercel.app
+        sync: false
       - key: ALLOWED_ORIGINS
-        value: https://machliphon-client.vercel.app
+        sync: false
 
 databases:
   - name: machliphon-db
     databaseName: machliphon
     user: machliphon
     plan: free
+    region: frankfurt
