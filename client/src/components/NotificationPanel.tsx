@@ -11,7 +11,7 @@ interface Notification {
   id: string;
   type: string;
   title: string;
-  body: string;
+  message: string;
   is_read: boolean;
   created_at: string;
   related_id?: string;
@@ -19,18 +19,18 @@ interface Notification {
 
 const DEMO_NOTIFICATIONS: Notification[] = [
   {
-    id: 'n-1',
-    type: 'assignment',
+    id: 'demo-n-1',
+    type: 'assignment_request',
     title: 'שיבוץ חדש',
-    body: 'שובצת לגן חבצלת ב-09:00',
+    message: 'שובצת לגן חבצלת ב-09:00',
     is_read: false,
     created_at: new Date().toISOString(),
   },
   {
-    id: 'n-2',
-    type: 'info',
+    id: 'demo-n-2',
+    type: 'general',
     title: 'ברוכה הבאה למחליפון',
-    body: 'המערכת מוכנה לשימוש',
+    message: 'המערכת מוכנה לשימוש',
     is_read: true,
     created_at: new Date(Date.now() - 86400000).toISOString(),
   },
@@ -158,7 +158,7 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
                         {notification.title}
                       </p>
                       <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
-                        {notification.body}
+                        {notification.message}
                       </p>
                       <p className="text-[11px] text-slate-400 mt-1">
                         {formatDistanceToNow(new Date(notification.created_at), {

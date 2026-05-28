@@ -55,20 +55,23 @@ export default function AppLayout() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
+  const fetchUnread = () => {
+    api.get('/notifications/unread-count')
+      .then(r => setUnreadCount(r.data.count || 0))
+      .catch(() => {});
+  };
+
   useEffect(() => {
-    const fetchUnread = () => {
-      api.get('/notifications/unread-count')
-        .then(r => setUnreadCount(r.data.count || 0))
-        .catch(() => {});
-    };
     fetchUnread();
     const id = setInterval(fetchUnread, 30_000);
     return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleCloseNotifications = () => {
     setShowNotifications(false);
-    queryClient.invalidateQueries({ queryKey: ['notifications-unread'] });
+    fetchUnread();
+    queryClient.invalidateQueries({ queryKey: ['notifications'] });
   };
 
   if (!user) return null;
