@@ -383,7 +383,10 @@ export default function DashboardPage() {
                 {['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳'].map(d => (
                   <div key={d} className="text-center text-xs font-medium text-slate-400 pb-1">{d}</div>
                 ))}
-                {monthDays.map((day, i) => {
+                {isLoading && Array.from({ length: 24 }, (_, i) => (
+                  <div key={`skel-${i}`} className="h-10 bg-slate-100 rounded-lg animate-pulse" />
+                ))}
+                {!isLoading && monthDays.map((day, i) => {
                   if (!day) return <div key={`empty-${i}`} />;
                   const dateStr = format(day, 'yyyy-MM-dd');
                   const info = getDateInfo(dateStr, day);
@@ -429,10 +432,36 @@ export default function DashboardPage() {
                   </button>
                 </div>
 
-                {/* Show days with holes in the month */}
-                {allMonthDates
-                  .filter(day => isSameMonth(day, currentDate))
-                  .map(day => {
+                {/* Skeleton while loading */}
+                {isLoading && Array.from({ length: 6 }, (_, i) => (
+                  <div key={`list-skel-${i}`} className="flex items-center gap-3 py-3 px-4 rounded-xl bg-slate-50">
+                    <div className="h-12 w-12 bg-slate-200 rounded-lg animate-pulse flex-shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-3.5 w-1/2 bg-slate-200 rounded animate-pulse" />
+                      <div className="h-3 w-1/3 bg-slate-100 rounded animate-pulse" />
+                    </div>
+                  </div>
+                ))}
+
+                {/* Show days with absences in the month */}
+                {!isLoading && (() => {
+                  const daysInView = allMonthDates.filter(day => isSameMonth(day, currentDate));
+                  const daysWithData = daysInView.filter(day => {
+                    const dateStr = format(day, 'yyyy-MM-dd');
+                    return isHoliday(dateStr) || allAbsences.some(a => a.absence_date === dateStr);
+                  });
+
+                  if (daysWithData.length === 0) {
+                    return (
+                      <div className="text-center py-10 text-slate-400">
+                        <CheckCircle size={36} className="mx-auto mb-3 text-mint-300" />
+                        <p className="text-sm font-medium">אין היעדרויות בחודש זה</p>
+                        <p className="text-xs mt-1 text-slate-300">כל הגנים מכוסים</p>
+                      </div>
+                    );
+                  }
+
+                  return daysInView.map(day => {
                     const dateStr = format(day, 'yyyy-MM-dd');
                     const hol = isHoliday(dateStr);
                     const dayAbs = allAbsences.filter(a => a.absence_date === dateStr);
@@ -486,7 +515,8 @@ export default function DashboardPage() {
                         )}
                       </button>
                     );
-                  })}
+                  });
+                })()}
               </div>
             )}
 
