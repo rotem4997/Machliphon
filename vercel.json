@@ -4,7 +4,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://machliphon.onrender.com/api/:path*"
+      "destination": "https://mvp-server-qa78.onrender.com/api/:path*"
     },
     {
       "source": "/((?!api/).*)",
