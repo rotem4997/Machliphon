@@ -19,4 +19,22 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // React core
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          // Data fetching + state
+          'vendor-query': ['@tanstack/react-query', 'zustand'],
+          // Charts (heavy — recharts is ~400KB)
+          'vendor-charts': ['recharts'],
+          // Date utilities
+          'vendor-dates': ['date-fns'],
+          // UI utilities
+          'vendor-ui': ['lucide-react', 'react-hot-toast', 'axios'],
+        },
+      },
+    },
+  },
 })
