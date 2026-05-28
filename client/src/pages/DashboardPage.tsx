@@ -2,7 +2,8 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Calendar, AlertTriangle, ChevronRight, ChevronLeft, Plus, X,
-  Clock, User, LayoutGrid, List, CheckCircle, Phone, Sparkles,
+  Clock, User, LayoutGrid, List, CheckCircle, Sparkles,
+  AlertCircle, RefreshCw,
 } from 'lucide-react';
 import api, { handleApiError } from '@/utils/api';
 import { useAuthStore } from '@/context/authStore';
@@ -90,7 +91,7 @@ export default function DashboardPage() {
   const { isDemoMode } = useAuthStore();
 
   // ─── Queries ───────────────────────────────────────────
-  const { data: kindergartens } = useQuery<Kindergarten[]>({
+  const { data: kindergartens, isLoading: isLoadingKindergartens } = useQuery<Kindergarten[]>({
     queryKey: ['kindergartens'],
     queryFn: () => api.get('/kindergartens').then(r => r.data)
       .catch(() => isDemoMode ? DEMO_KINDERGARTENS : []),
@@ -101,7 +102,11 @@ export default function DashboardPage() {
   const prev = subMonths(currentDate, 1);
   const next = addMonths(currentDate, 1);
 
-  const { data: assignments } = useQuery<Assignment[]>({
+  const {
+    data: assignments,
+    isLoading: isLoadingAssignments,
+    isError: isAssignmentsError,
+  } = useQuery<Assignment[]>({
     queryKey: ['assignments', visibleYear, visibleMonth],
     queryFn: () => api.get('/assignments', { params: { month: visibleMonth, year: visibleYear } }).then(r => r.data)
       .catch(() => isDemoMode ? DEMO_ASSIGNMENTS : []),
@@ -116,7 +121,11 @@ export default function DashboardPage() {
     queryFn: () => api.get('/assignments', { params: { month: next.getMonth() + 1, year: next.getFullYear() } }).then(r => r.data)
       .catch(() => []),
   });
-  const { data: absences } = useQuery<AbsenceReport[]>({
+  const {
+    data: absences,
+    isLoading: isLoadingAbsences,
+    isError: isAbsencesError,
+  } = useQuery<AbsenceReport[]>({
     queryKey: ['absences', visibleYear, visibleMonth],
     queryFn: () => api.get('/absences', { params: { month: visibleMonth, year: visibleYear } }).then(r => r.data)
       .catch(() => isDemoMode ? DEMO_ABSENCES : []),
@@ -131,6 +140,15 @@ export default function DashboardPage() {
     queryFn: () => api.get('/absences', { params: { month: next.getMonth() + 1, year: next.getFullYear() } }).then(r => r.data)
       .catch(() => []),
   });
+
+  const isLoading = isLoadingAssignments || isLoadingAbsences || isLoadingKindergartens;
+  const hasDataError = isAssignmentsError || isAbsencesError;
+
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['assignments'] });
+    queryClient.invalidateQueries({ queryKey: ['absences'] });
+    queryClient.invalidateQueries({ queryKey: ['kindergartens'] });
+  };
 
   const kgs = useMemo(() => kindergartens ?? [], [kindergartens]);
   const allAssignments = useMemo(
@@ -232,21 +250,40 @@ export default function DashboardPage() {
             {format(today, 'EEEE, d בMMMM yyyy', { locale: he })}
           </p>
         </div>
-        {/* KPI badges */}
+        {/* KPI badges + refresh */}
         <div className="flex items-center gap-3">
-          <div className={`px-4 py-2 rounded-xl text-sm font-bold ${
-            coveragePct >= 80 ? 'bg-mint-100 text-mint-700' :
-            coveragePct >= 50 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'
-          }`}>
-            {coveragePct}% כיסוי
-          </div>
-          {holes.length > 0 && !holiday && !isSaturday && (
+          {isLoading ? (
+            <div className="h-9 w-24 bg-slate-100 rounded-xl animate-pulse" />
+          ) : (
+            <div className={`px-4 py-2 rounded-xl text-sm font-bold ${
+              coveragePct >= 80 ? 'bg-mint-100 text-mint-700' :
+              coveragePct >= 50 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'
+            }`}>
+              {coveragePct}% כיסוי
+            </div>
+          )}
+          {holes.length > 0 && !holiday && !isSaturday && !isLoading && (
             <div className="px-4 py-2 rounded-xl text-sm font-bold bg-red-50 text-red-700">
               {holes.length} חורים
             </div>
           )}
+          <button
+            onClick={handleRefresh}
+            title="רענון נתונים"
+            className={`p-2 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-navy-700 transition-colors ${isLoading ? 'animate-spin' : ''}`}
+          >
+            <RefreshCw size={16} />
+          </button>
         </div>
       </div>
+
+      {/* Error banner */}
+      {hasDataError && (
+        <div className="card p-4 text-red-600 text-sm flex items-center gap-2 border border-red-200 bg-red-50">
+          <AlertCircle size={16} className="flex-shrink-0" />
+          <span>שגיאה בטעינת הנתונים. בדקי את החיבור לשרת.</span>
+        </div>
+      )}
 
       <div className="flex flex-col lg:flex-row gap-5">
         {/* ═══ LEFT: Calendar ═══ */}
@@ -487,6 +524,13 @@ export default function DashboardPage() {
                 <p className="font-semibold text-slate-500">שבת</p>
                 <p className="text-slate-400 text-xs mt-1">אין שיבוצים בשבת</p>
               </div>
+            ) : isLoadingAbsences || isLoadingAssignments ? (
+              /* Skeleton for day detail */
+              <div className="space-y-3 mt-3">
+                <div className="h-4 w-2/3 bg-slate-100 rounded animate-pulse" />
+                <div className="h-16 bg-slate-100 rounded-xl animate-pulse" />
+                <div className="h-16 bg-slate-100 rounded-xl animate-pulse" />
+              </div>
             ) : (
               <>
                 <p className="text-slate-500 text-sm">
@@ -498,7 +542,7 @@ export default function DashboardPage() {
                 </p>
 
                 {/* Holes - action items (open absences without coverage) */}
-                {holes.length > 0 && (
+                {holes.length > 0 ? (
                   <div className="mt-4">
                     <h4 className="text-sm font-bold text-red-600 mb-2 flex items-center gap-1.5">
                       <AlertTriangle size={14} />
@@ -528,10 +572,15 @@ export default function DashboardPage() {
                       ))}
                     </div>
                   </div>
+                ) : totalAbsences === 0 && (
+                  <div className="text-center py-8 text-slate-400 mt-3">
+                    <CheckCircle size={32} className="mx-auto mb-2 text-mint-400" />
+                    <p className="text-sm">אין היעדרויות פתוחות היום</p>
+                  </div>
                 )}
 
                 {/* Covered assignments */}
-                {dayAssignments.length > 0 && (
+                {dayAssignments.length > 0 ? (
                   <div className="mt-4">
                     <h4 className="text-sm font-bold text-navy-900 mb-2">שיבוצים פעילים</h4>
                     <div className="space-y-2">
@@ -557,7 +606,7 @@ export default function DashboardPage() {
                       ))}
                     </div>
                   </div>
-                )}
+                ) : totalAbsences > 0 && holes.length === 0 && null}
 
                 {holes.length === 0 && totalAbsences > 0 && (
                   <div className="bg-mint-50 rounded-xl p-3 text-center mt-4">
@@ -572,13 +621,21 @@ export default function DashboardPage() {
           {/* Quick stats */}
           <div className="grid grid-cols-2 gap-3">
             <div className="card p-4 text-center">
-              <p className="text-2xl font-black text-navy-900">{totalKgs}</p>
+              {isLoadingKindergartens ? (
+                <div className="h-8 w-12 bg-slate-100 rounded animate-pulse mx-auto mb-1" />
+              ) : (
+                <p className="text-2xl font-black text-navy-900">{totalKgs}</p>
+              )}
               <p className="text-xs text-slate-500 mt-0.5">גנים בניהולך</p>
             </div>
             <div className="card p-4 text-center">
-              <p className={`text-2xl font-black ${coveragePct >= 80 ? 'text-mint-500' : 'text-red-500'}`}>
-                {coveragePct}%
-              </p>
+              {isLoadingAbsences ? (
+                <div className="h-8 w-14 bg-slate-100 rounded animate-pulse mx-auto mb-1" />
+              ) : (
+                <p className={`text-2xl font-black ${coveragePct >= 80 ? 'text-mint-500' : 'text-red-500'}`}>
+                  {coveragePct}%
+                </p>
+              )}
               <p className="text-xs text-slate-500 mt-0.5">כיסוי היום</p>
             </div>
           </div>
