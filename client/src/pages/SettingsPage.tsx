@@ -240,9 +240,10 @@ export default function SettingsPage() {
           <div className="flex justify-end">
             <button
               onClick={handleSave}
-              className={`btn-primary flex items-center gap-2 transition-all ${saved ? 'bg-mint-600' : ''}`}
+              disabled={mutation.isPending}
+              className={`btn-primary flex items-center gap-2 transition-all disabled:opacity-60 disabled:cursor-not-allowed ${saved ? 'bg-mint-600' : ''}`}
             >
-              {saved ? <><CheckCircle size={16} /> נשמר!</> : 'שמור הגדרות'}
+              {mutation.isPending ? 'שומר...' : saved ? <><CheckCircle size={16} /> נשמר!</> : 'שמור הגדרות'}
             </button>
           </div>
         </>

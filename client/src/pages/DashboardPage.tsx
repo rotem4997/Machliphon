@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Calendar, AlertTriangle, ChevronRight, ChevronLeft, Plus, X,
   Clock, User, LayoutGrid, List, CheckCircle, Sparkles,
-  AlertCircle, RefreshCw,
+  RefreshCw,
 } from 'lucide-react';
 import api, { handleApiError } from '@/utils/api';
 import { useAuthStore } from '@/context/authStore';
@@ -105,7 +105,6 @@ export default function DashboardPage() {
   const {
     data: assignments,
     isLoading: isLoadingAssignments,
-    isError: isAssignmentsError,
   } = useQuery<Assignment[]>({
     queryKey: ['assignments', visibleYear, visibleMonth],
     queryFn: () => api.get('/assignments', { params: { month: visibleMonth, year: visibleYear } }).then(r => r.data)
@@ -124,7 +123,6 @@ export default function DashboardPage() {
   const {
     data: absences,
     isLoading: isLoadingAbsences,
-    isError: isAbsencesError,
   } = useQuery<AbsenceReport[]>({
     queryKey: ['absences', visibleYear, visibleMonth],
     queryFn: () => api.get('/absences', { params: { month: visibleMonth, year: visibleYear } }).then(r => r.data)
@@ -142,7 +140,6 @@ export default function DashboardPage() {
   });
 
   const isLoading = isLoadingAssignments || isLoadingAbsences || isLoadingKindergartens;
-  const hasDataError = isAssignmentsError || isAbsencesError;
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['assignments'] });
@@ -277,13 +274,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Error banner */}
-      {hasDataError && (
-        <div className="card p-4 text-red-600 text-sm flex items-center gap-2 border border-red-200 bg-red-50">
-          <AlertCircle size={16} className="flex-shrink-0" />
-          <span>שגיאה בטעינת הנתונים. בדקי את החיבור לשרת.</span>
-        </div>
-      )}
+
 
       <div className="flex flex-col lg:flex-row gap-5">
         {/* ═══ LEFT: Calendar ═══ */}

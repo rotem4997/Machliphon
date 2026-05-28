@@ -14,13 +14,9 @@ until pg_isready -p 5432 -q; do sleep 1; done
 echo "  ✅ PostgreSQL ready"
 
 echo "▶ Setting up database..."
-if command -v psql >/dev/null 2>&1; then
-  sudo -u postgres psql -c "CREATE USER machliphon WITH PASSWORD 'machliphon123';" 2>/dev/null || true
-  sudo -u postgres psql -c "CREATE DATABASE machliphon OWNER machliphon;" 2>/dev/null || true
-  echo "  ✅ Database ready"
-else
-  echo "  ⚠️  psql not found — skipping DB auto-setup"
-fi
+sudo -u postgres psql -c "CREATE USER machliphon WITH PASSWORD 'machliphon123';" 2>/dev/null || true
+sudo -u postgres psql -c "CREATE DATABASE machliphon OWNER machliphon;" 2>/dev/null || true
+echo "  ✅ Database ready"
 
 echo "▶ Building app..."
 npm run build 2>&1 | grep -E "built|error|Error" || true
@@ -33,7 +29,7 @@ sleep 1
 cd server
 DATABASE_URL=postgresql://machliphon:machliphon123@localhost:5432/machliphon \
 JWT_SECRET=machliphon-dev-secret-2026-change-in-production \
-NODE_ENV=development \
+NODE_ENV=production \
 PORT=3001 \
 node dist/index.js &
 SERVER_PID=$!

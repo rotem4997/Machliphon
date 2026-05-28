@@ -3,7 +3,7 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { query } from '../db/pool';
 import { z } from 'zod';
-import { AppError, NotFoundError, ValidationError } from '../errors/AppError';
+import { NotFoundError, ValidationError } from '../errors/AppError';
 
 const router = Router();
 

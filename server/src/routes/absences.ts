@@ -23,12 +23,16 @@ router.get('/', requireRole('manager', 'authority_admin', 'super_admin'), asyncH
   let paramIdx = 2;
   if (req.user!.role === 'manager') {
     const mgr = await query('SELECT id FROM managers WHERE user_id = $1', [req.user!.id]);
-    if (mgr.rows.length > 0) {
-      sql += ` AND ar.kindergarten_id IN (
+    if (mgr.rows.length === 0) {
+      throw new NotFoundError('מנהלת לא נמצאה.', {
+        source: 'GET /api/absences',
+        detail: `No manager profile for user ${req.user!.id}`,
+      });
+    }
+    sql += ` AND ar.kindergarten_id IN (
       SELECT mk.kindergarten_id FROM manager_kindergartens mk WHERE mk.manager_id = $${paramIdx++}
     )`;
-      params.push(mgr.rows[0].id);
-    }
+    params.push(mgr.rows[0].id);
   }
   if (date) { sql += ` AND ar.absence_date = $${paramIdx++}`; params.push(date); }
   else if (month && year) { sql += ` AND EXTRACT(MONTH FROM ar.absence_date) = $${paramIdx++} AND EXTRACT(YEAR FROM ar.absence_date) = $${paramIdx++}`; params.push(month, year); }
