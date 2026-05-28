@@ -21,16 +21,24 @@ router.use(authenticate);
 
 // GET /api/assignments
 router.get('/', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const { date, month, year, status, kindergartenId } = req.query;
+  const { date, month, year, status, kindergartenId, page: pageParam, limit: limitParam } = req.query;
   const authorityId = req.user!.authority_id;
 
-  let sql = `
+  // Pagination is opt-in: only activate when both page and limit are provided
+  const usePagination = pageParam !== undefined && limitParam !== undefined;
+  const page = usePagination ? Math.max(1, parseInt(pageParam as string, 10) || 1) : 1;
+  const limit = usePagination ? Math.min(100, Math.max(1, parseInt(limitParam as string, 10) || 20)) : 0;
+  const offset = (page - 1) * limit;
+
+  const selectSql = `
     SELECT
       a.*,
       k.name as kindergarten_name, k.address as kindergarten_address, k.neighborhood,
       u_sub.first_name as substitute_first_name, u_sub.last_name as substitute_last_name,
       u_sub.phone as substitute_phone,
-      u_mgr.first_name as manager_first_name, u_mgr.last_name as manager_last_name
+      u_mgr.first_name as manager_first_name, u_mgr.last_name as manager_last_name`;
+
+  let baseSql = `
     FROM assignments a
     JOIN kindergartens k ON a.kindergarten_id = k.id
     JOIN substitutes s ON a.substitute_id = s.id
@@ -42,29 +50,52 @@ router.get('/', asyncHandler(async (req: AuthRequest, res: Response) => {
   let paramIdx = 2;
 
   if (date) {
-    sql += ` AND a.assignment_date = $${paramIdx++}`;
+    baseSql += ` AND a.assignment_date = $${paramIdx++}`;
     params.push(date);
   } else if (month && year) {
-    sql += ` AND EXTRACT(MONTH FROM a.assignment_date) = $${paramIdx++} AND EXTRACT(YEAR FROM a.assignment_date) = $${paramIdx++}`;
+    baseSql += ` AND EXTRACT(MONTH FROM a.assignment_date) = $${paramIdx++} AND EXTRACT(YEAR FROM a.assignment_date) = $${paramIdx++}`;
     params.push(month, year);
   }
   if (status) {
-    sql += ` AND a.status = $${paramIdx++}`;
+    baseSql += ` AND a.status = $${paramIdx++}`;
     params.push(status);
   }
   if (kindergartenId) {
-    sql += ` AND a.kindergarten_id = $${paramIdx++}`;
+    baseSql += ` AND a.kindergarten_id = $${paramIdx++}`;
     params.push(kindergartenId);
   }
   if (req.user!.role === 'substitute') {
     const subResult = await query('SELECT id FROM substitutes WHERE user_id = $1', [req.user!.id]);
     if (subResult.rows.length > 0) {
-      sql += ` AND a.substitute_id = $${paramIdx++}`;
+      baseSql += ` AND a.substitute_id = $${paramIdx++}`;
       params.push(subResult.rows[0].id);
     }
   }
-  sql += ` ORDER BY a.assignment_date DESC, a.created_at DESC`;
-  const result = await query(sql, params);
+
+  const orderSql = ` ORDER BY a.assignment_date DESC, a.created_at DESC`;
+
+  if (usePagination) {
+    const countSql = `SELECT COUNT(*) as total
+      FROM assignments a
+      JOIN kindergartens k ON a.kindergarten_id = k.id
+      JOIN substitutes s ON a.substitute_id = s.id
+      JOIN users u_sub ON s.user_id = u_sub.id
+      JOIN users u_mgr ON a.assigned_by = u_mgr.id
+      ${baseSql.slice(baseSql.indexOf('WHERE'))}`;
+    const countResult = await query(countSql, params);
+    const total = parseInt(countResult.rows[0].total, 10);
+    const paginatedSql = `${selectSql} ${baseSql}${orderSql} LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
+    const result = await query(paginatedSql, [...params, limit, offset]);
+    return res.json({
+      data: result.rows,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    });
+  }
+
+  const result = await query(`${selectSql} ${baseSql}${orderSql}`, params);
   return res.json(result.rows);
 }));
 

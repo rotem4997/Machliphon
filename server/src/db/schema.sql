@@ -273,6 +273,12 @@ CREATE INDEX IF NOT EXISTS idx_absence_reports_date ON absence_reports(absence_d
 CREATE INDEX IF NOT EXISTS idx_absence_reports_status ON absence_reports(status);
 CREATE INDEX IF NOT EXISTS idx_availability_date ON substitute_availability(date);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read);
+CREATE INDEX IF NOT EXISTS idx_kindergartens_authority_active ON kindergartens(authority_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_absence_reports_kg_status_date ON absence_reports(kindergarten_id, status, absence_date DESC);
+CREATE INDEX IF NOT EXISTS idx_assignments_kg_date_status ON assignments(kindergarten_id, assignment_date, status);
+CREATE INDEX IF NOT EXISTS idx_manager_kg_reverse ON manager_kindergartens(kindergarten_id);
+CREATE INDEX IF NOT EXISTS idx_substitutes_authority_permit ON substitutes(authority_id, work_permit_expiry);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications(user_id, created_at DESC);
 
 -- ============================================
 -- UPDATED_AT trigger

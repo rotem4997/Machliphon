@@ -21,15 +21,24 @@ router.get('/stats', asyncHandler(async (req: AuthRequest, res: Response) => {
       AND work_permit_expiry BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'`, [authorityId]),
   ]);
 
+  const weekStart = new Date();
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+  weekStart.setHours(0, 0, 0, 0);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+
   const weekCoverage = await query(`
+    WITH authority_kgs AS (
+      SELECT id FROM kindergartens WHERE authority_id = $1 AND is_active = true
+    )
     SELECT d.dt::date as date,
       COUNT(a2.id) FILTER (WHERE a2.status NOT IN ('cancelled')) as assignments,
       COUNT(ar.id) FILTER (WHERE ar.status = 'open') as open_absences
-    FROM generate_series(DATE_TRUNC('week', CURRENT_DATE), DATE_TRUNC('week', CURRENT_DATE) + INTERVAL '6 days', '1 day') as d(dt)
-    LEFT JOIN absence_reports ar ON ar.absence_date = d.dt AND ar.kindergarten_id IN (SELECT id FROM kindergartens WHERE authority_id = $1)
-    LEFT JOIN assignments a2 ON a2.assignment_date = d.dt AND a2.kindergarten_id IN (SELECT id FROM kindergartens WHERE authority_id = $1)
+    FROM generate_series($2::date, $3::date, '1 day') as d(dt)
+    LEFT JOIN absence_reports ar ON ar.absence_date = d.dt AND ar.kindergarten_id IN (SELECT id FROM authority_kgs)
+    LEFT JOIN assignments a2 ON a2.assignment_date = d.dt AND a2.kindergarten_id IN (SELECT id FROM authority_kgs)
     GROUP BY d.dt::date ORDER BY date
-  `, [authorityId]);
+  `, [authorityId, weekStart.toISOString().slice(0, 10), weekEnd.toISOString().slice(0, 10)]);
 
   return res.json({
     totalSubstitutes: parseInt(substitutes.rows[0].count),

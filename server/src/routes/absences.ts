@@ -9,11 +9,16 @@ router.use(authenticate);
 
 // GET /api/absences
 router.get('/', requireRole('manager', 'authority_admin', 'super_admin'), asyncHandler(async (req: AuthRequest, res: Response) => {
-  const { date, status, kindergartenId, month, year } = req.query;
+  const { date, status, kindergartenId, month, year, page: pageParam, limit: limitParam } = req.query;
   const authorityId = req.user!.authority_id;
-  let sql = `
-    SELECT ar.*, k.name as kindergarten_name, k.address as kindergarten_address, k.neighborhood,
-      u.first_name as reporter_first_name, u.last_name as reporter_last_name
+
+  // Pagination is opt-in: only activate when both page and limit are provided
+  const usePagination = pageParam !== undefined && limitParam !== undefined;
+  const page = usePagination ? Math.max(1, parseInt(pageParam as string, 10) || 1) : 1;
+  const limit = usePagination ? Math.min(100, Math.max(1, parseInt(limitParam as string, 10) || 20)) : 0;
+  const offset = (page - 1) * limit;
+
+  let baseSql = `
     FROM absence_reports ar
     JOIN kindergartens k ON ar.kindergarten_id = k.id
     JOIN users u ON ar.reported_by = u.id
@@ -21,6 +26,7 @@ router.get('/', requireRole('manager', 'authority_admin', 'super_admin'), asyncH
   `;
   const params: unknown[] = [authorityId];
   let paramIdx = 2;
+
   if (req.user!.role === 'manager') {
     const mgr = await query('SELECT id FROM managers WHERE user_id = $1', [req.user!.id]);
     if (mgr.rows.length === 0) {
@@ -29,17 +35,35 @@ router.get('/', requireRole('manager', 'authority_admin', 'super_admin'), asyncH
         detail: `No manager profile for user ${req.user!.id}`,
       });
     }
-    sql += ` AND ar.kindergarten_id IN (
+    baseSql += ` AND ar.kindergarten_id IN (
       SELECT mk.kindergarten_id FROM manager_kindergartens mk WHERE mk.manager_id = $${paramIdx++}
     )`;
     params.push(mgr.rows[0].id);
   }
-  if (date) { sql += ` AND ar.absence_date = $${paramIdx++}`; params.push(date); }
-  else if (month && year) { sql += ` AND EXTRACT(MONTH FROM ar.absence_date) = $${paramIdx++} AND EXTRACT(YEAR FROM ar.absence_date) = $${paramIdx++}`; params.push(month, year); }
-  if (status) { sql += ` AND ar.status = $${paramIdx++}`; params.push(status); }
-  if (kindergartenId) { sql += ` AND ar.kindergarten_id = $${paramIdx++}`; params.push(kindergartenId); }
-  sql += ` ORDER BY ar.absence_date DESC, ar.created_at DESC`;
-  const result = await query(sql, params);
+  if (date) { baseSql += ` AND ar.absence_date = $${paramIdx++}`; params.push(date); }
+  else if (month && year) { baseSql += ` AND EXTRACT(MONTH FROM ar.absence_date) = $${paramIdx++} AND EXTRACT(YEAR FROM ar.absence_date) = $${paramIdx++}`; params.push(month, year); }
+  if (status) { baseSql += ` AND ar.status = $${paramIdx++}`; params.push(status); }
+  if (kindergartenId) { baseSql += ` AND ar.kindergarten_id = $${paramIdx++}`; params.push(kindergartenId); }
+
+  const orderSql = ` ORDER BY ar.absence_date DESC, ar.created_at DESC`;
+  const selectSql = `SELECT ar.*, k.name as kindergarten_name, k.address as kindergarten_address, k.neighborhood,
+      u.first_name as reporter_first_name, u.last_name as reporter_last_name`;
+
+  if (usePagination) {
+    const countResult = await query(`SELECT COUNT(*) as total ${baseSql}`, params);
+    const total = parseInt(countResult.rows[0].total, 10);
+    const paginatedSql = `${selectSql} ${baseSql}${orderSql} LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
+    const result = await query(paginatedSql, [...params, limit, offset]);
+    return res.json({
+      data: result.rows,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    });
+  }
+
+  const result = await query(`${selectSql} ${baseSql}${orderSql}`, params);
   return res.json(result.rows);
 }));
 

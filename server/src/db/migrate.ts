@@ -70,6 +70,14 @@ export async function runMigrations() {
     console.warn('⚠️  Could not reset demo passwords:', err);
   }
 
+  // Add composite indexes for 70-kindergarten scale performance
+  await query(`CREATE INDEX IF NOT EXISTS idx_kindergartens_authority_active ON kindergartens(authority_id, is_active)`).catch(() => {});
+  await query(`CREATE INDEX IF NOT EXISTS idx_absence_reports_kg_status_date ON absence_reports(kindergarten_id, status, absence_date DESC)`).catch(() => {});
+  await query(`CREATE INDEX IF NOT EXISTS idx_assignments_kg_date_status ON assignments(kindergarten_id, assignment_date, status)`).catch(() => {});
+  await query(`CREATE INDEX IF NOT EXISTS idx_manager_kg_reverse ON manager_kindergartens(kindergarten_id)`).catch(() => {});
+  await query(`CREATE INDEX IF NOT EXISTS idx_substitutes_authority_permit ON substitutes(authority_id, work_permit_expiry)`).catch(() => {});
+  await query(`CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications(user_id, created_at DESC)`).catch(() => {});
+
   console.log('✅ Migration complete');
 }
 

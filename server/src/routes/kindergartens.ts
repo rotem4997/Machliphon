@@ -10,10 +10,42 @@ router.use(authenticate);
 // GET /api/kindergartens
 router.get('/', asyncHandler(async (req: AuthRequest, res: Response) => {
   const authorityId = req.user!.authority_id;
-  const result = await query(`
-    SELECT id, name, address, neighborhood, principal_name, phone, age_group, capacity, is_active
-    FROM kindergartens WHERE authority_id = $1 AND is_active = true ORDER BY name
-  `, [authorityId]);
+  const { page: pageParam, limit: limitParam, search } = req.query;
+
+  // Pagination is opt-in: only activate when both page and limit are provided
+  const usePagination = pageParam !== undefined && limitParam !== undefined;
+  const page = usePagination ? Math.max(1, parseInt(pageParam as string, 10) || 1) : 1;
+  const limit = usePagination ? Math.min(100, Math.max(1, parseInt(limitParam as string, 10) || 20)) : 0;
+  const offset = (page - 1) * limit;
+
+  const params: unknown[] = [authorityId];
+  let paramIdx = 2;
+  let whereSql = `WHERE authority_id = $1 AND is_active = true`;
+
+  if (search) {
+    whereSql += ` AND name ILIKE $${paramIdx++}`;
+    params.push(`%${search}%`);
+  }
+
+  const selectSql = `SELECT id, name, address, neighborhood, principal_name, phone, age_group, capacity, is_active
+    FROM kindergartens`;
+  const orderSql = ` ORDER BY name`;
+
+  if (usePagination) {
+    const countResult = await query(`SELECT COUNT(*) as total FROM kindergartens ${whereSql}`, params);
+    const total = parseInt(countResult.rows[0].total, 10);
+    const paginatedSql = `${selectSql} ${whereSql}${orderSql} LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
+    const result = await query(paginatedSql, [...params, limit, offset]);
+    return res.json({
+      data: result.rows,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    });
+  }
+
+  const result = await query(`${selectSql} ${whereSql}${orderSql}`, params);
   return res.json(result.rows);
 }));
 
