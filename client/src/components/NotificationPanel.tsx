@@ -2,6 +2,7 @@ import { X, Bell, CheckCheck } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { he } from 'date-fns/locale';
+import { Link } from 'react-router-dom';
 import api from '@/utils/api';
 import { useAuthStore } from '@/context/authStore';
 import toast from 'react-hot-toast';
@@ -171,6 +172,18 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
               ))}
             </ul>
           )}
+        </div>
+
+        {/* Footer — link to full notifications page */}
+        <div className="border-t border-slate-200 px-4 py-3 flex-shrink-0">
+          <Link
+            to="/notifications"
+            onClick={onClose}
+            className="flex items-center justify-center gap-1.5 w-full text-sm text-navy-700 font-medium hover:text-mint-600 transition-colors"
+          >
+            <Bell size={14} />
+            הצג הכל
+          </Link>
         </div>
       </div>
     </>

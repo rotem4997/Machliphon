@@ -24,6 +24,7 @@ import MLInsightsPage from './pages/MLInsightsPage';
 import SettingsPage from './pages/SettingsPage';
 import LandingPage from './pages/LandingPage';
 import AgentDashboard from './pages/AgentDashboard';
+import NotificationsPage from './pages/NotificationsPage';
 import { useAuthStore } from './context/authStore';
 
 // Clear any stale demo tokens left over from previous sessions.
@@ -97,6 +98,7 @@ export default function App() {
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/availability" element={<AvailabilityPage />} />
+              <Route path="/notifications" element={<NotificationsPage />} />
             </Route>
           </Route>
 
