@@ -336,7 +336,10 @@ export default function DashboardPage() {
                 {['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳'].map(d => (
                   <div key={d} className="text-center text-xs font-medium text-slate-400 pb-1">{d}</div>
                 ))}
-                {weekDays.map(day => {
+                {isLoading && weekDays.map(day => (
+                  <div key={day.toString()} className="h-20 bg-slate-100 rounded-xl animate-pulse" />
+                ))}
+                {!isLoading && weekDays.map(day => {
                   const dateStr = format(day, 'yyyy-MM-dd');
                   const info = getDateInfo(dateStr, day);
                   const isSelected = isSameDay(day, selectedDay);
@@ -606,7 +609,12 @@ export default function DashboardPage() {
                       ))}
                     </div>
                   </div>
-                ) : totalAbsences > 0 && holes.length === 0 && null}
+                ) : totalAbsences === 0 && (
+                  <div className="text-center py-6 text-slate-400 mt-3">
+                    <Calendar size={28} className="mx-auto mb-2 text-slate-300" />
+                    <p className="text-sm">אין שיבוצים ביום זה</p>
+                  </div>
+                )}
 
                 {holes.length === 0 && totalAbsences > 0 && (
                   <div className="bg-mint-50 rounded-xl p-3 text-center mt-4">
