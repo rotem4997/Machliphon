@@ -57,17 +57,19 @@ export default function AppLayout() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   const fetchUnread = () => {
+    if (!user) return;
     api.get('/notifications/unread-count')
       .then(r => setUnreadCount(r.data.count || 0))
       .catch(() => {});
   };
 
   useEffect(() => {
+    if (!user) return;
     fetchUnread();
     const id = setInterval(fetchUnread, 30_000);
     return () => clearInterval(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user?.id]);
 
   const handleCloseNotifications = () => {
     setShowNotifications(false);

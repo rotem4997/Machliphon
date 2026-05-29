@@ -1,18 +1,21 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../context/authStore';
 import Logo from '../components/Logo';
 import toast from 'react-hot-toast';
+import axios from 'axios';
 import type { UserRole } from '../context/authStore';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [waking, setWaking] = useState(false);
   const { login, loginDemo, isLoading } = useAuthStore();
   const navigate = useNavigate();
   const [demoLoading, setDemoLoading] = useState<UserRole | null>(null);
+  const retryToastRef = useRef<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,9 +23,31 @@ export default function LoginPage() {
       await login(email, password);
       navigate('/dashboard');
     } catch (error: unknown) {
+      const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+      if (status && status >= 500) {
+        // Render free-tier cold start — server is waking up, retry automatically
+        setWaking(true);
+        if (retryToastRef.current) toast.dismiss(retryToastRef.current);
+        retryToastRef.current = toast.loading('השרת מתעורר, ננסה שנית בעוד כמה שניות...', { duration: Infinity });
+        setTimeout(async () => {
+          try {
+            await login(email, password);
+            toast.dismiss(retryToastRef.current!);
+            navigate('/dashboard');
+          } catch (retryErr: unknown) {
+            toast.dismiss(retryToastRef.current!);
+            const raw = (retryErr as { response?: { data?: { error?: unknown } } })?.response?.data?.error;
+            const msg = typeof raw === 'string' ? raw : 'שגיאת שרת. נסה שנית.';
+            toast.error(msg);
+          } finally {
+            setWaking(false);
+          }
+        }, 8000);
+        return;
+      }
       const raw = (error as { response?: { data?: { error?: unknown } } })?.response?.data?.error;
-      const msg = typeof raw === 'string' ? raw : undefined;
-      toast.error(msg || 'שגיאה בכניסה. נסה שנית.');
+      const msg = typeof raw === 'string' ? raw : 'שגיאה בכניסה. נסה שנית.';
+      toast.error(msg);
     }
   };
 
@@ -105,11 +130,11 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || waking}
               className="btn-primary w-full flex items-center justify-center gap-2 py-3 text-base"
             >
-              {isLoading ? (
-                <><Loader2 size={18} className="animate-spin" /> מתחבר...</>
+              {isLoading || waking ? (
+                <><Loader2 size={18} className="animate-spin" /> {waking ? 'מתחבר לשרת...' : 'מתחבר...'}</>
               ) : (
                 'כניסה'
               )}

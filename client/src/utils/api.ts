@@ -164,6 +164,8 @@ api.interceptors.response.use(
           : undefined;
         if (refreshStatus === 401 || refreshStatus === 403) {
           localStorage.removeItem('machliphon-auth');
+          // Signal the app to clear in-memory auth state (avoids circular import)
+          window.dispatchEvent(new CustomEvent('machliphon:force-logout'));
         }
         return Promise.reject(error);
       }
