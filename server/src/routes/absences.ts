@@ -9,7 +9,7 @@ router.use(authenticate);
 
 // GET /api/absences
 router.get('/', requireRole('manager', 'authority_admin', 'super_admin'), asyncHandler(async (req: AuthRequest, res: Response) => {
-  const { date, status, kindergartenId, month, year, page: pageParam, limit: limitParam } = req.query;
+  const { date, status, reason, search, kindergartenId, month, year, page: pageParam, limit: limitParam } = req.query;
   const authorityId = req.user!.authority_id;
 
   // Pagination is opt-in: only activate when both page and limit are provided
@@ -43,7 +43,13 @@ router.get('/', requireRole('manager', 'authority_admin', 'super_admin'), asyncH
   if (date) { baseSql += ` AND ar.absence_date = $${paramIdx++}`; params.push(date); }
   else if (month && year) { baseSql += ` AND EXTRACT(MONTH FROM ar.absence_date) = $${paramIdx++} AND EXTRACT(YEAR FROM ar.absence_date) = $${paramIdx++}`; params.push(month, year); }
   if (status) { baseSql += ` AND ar.status = $${paramIdx++}`; params.push(status); }
+  if (reason) { baseSql += ` AND ar.absence_reason = $${paramIdx++}`; params.push(reason); }
   if (kindergartenId) { baseSql += ` AND ar.kindergarten_id = $${paramIdx++}`; params.push(kindergartenId); }
+  if (search) {
+    baseSql += ` AND (ar.absent_employee_name ILIKE $${paramIdx} OR k.name ILIKE $${paramIdx})`;
+    params.push(`%${search}%`);
+    paramIdx++;
+  }
 
   const orderSql = ` ORDER BY ar.absence_date DESC, ar.created_at DESC`;
   const selectSql = `SELECT ar.*, k.name as kindergarten_name, k.address as kindergarten_address, k.neighborhood,

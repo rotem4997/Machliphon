@@ -79,7 +79,9 @@ export const DEMO_ASSIGNMENTS = [
     kindergarten_id: 'kg-3', kindergarten_name: 'גן רקפת',
     kindergarten_address: 'שדרות בן גוריון 22', neighborhood: 'דרום',
     substitute_first_name: 'מרים', substitute_last_name: 'אברהם', substitute_phone: '054-1234567',
-    notes: null,
+    manager_first_name: 'רות', manager_last_name: 'כהן',
+    hours_worked: null, hourly_rate: null, total_pay: null,
+    notes: null, substitute_confirmed_at: null, substitute_arrived_at: null,
   },
   // Past — completed
   {
@@ -88,7 +90,9 @@ export const DEMO_ASSIGNMENTS = [
     kindergarten_id: 'kg-1', kindergarten_name: 'גן חבצלת',
     kindergarten_address: 'רחוב הרצל 15', neighborhood: 'מרכז',
     substitute_first_name: 'רחל', substitute_last_name: 'לוי', substitute_phone: '052-9876543',
-    notes: null, hours_worked: 6.5, total_pay: 357,
+    manager_first_name: 'דנה', manager_last_name: 'שרון',
+    hours_worked: 6.5, hourly_rate: 54.9, total_pay: 357,
+    notes: null, substitute_confirmed_at: null, substitute_arrived_at: null,
   },
   {
     id: 'asgn-3', absence_id: null, assignment_date: past(7),
@@ -96,7 +100,9 @@ export const DEMO_ASSIGNMENTS = [
     kindergarten_id: 'kg-2', kindergarten_name: 'גן נרקיס',
     kindergarten_address: 'רחוב ויצמן 8', neighborhood: 'צפון',
     substitute_first_name: 'שרה', substitute_last_name: 'כהן', substitute_phone: '050-5551234',
-    notes: null, hours_worked: 5.5, total_pay: 302,
+    manager_first_name: 'יעל', manager_last_name: 'רז',
+    hours_worked: 5.5, hourly_rate: 54.9, total_pay: 302,
+    notes: null, substitute_confirmed_at: null, substitute_arrived_at: null,
   },
   // Future — pending (for substitute view)
   {
@@ -105,7 +111,9 @@ export const DEMO_ASSIGNMENTS = [
     kindergarten_id: 'kg-4', kindergarten_name: 'גן כלנית',
     kindergarten_address: 'רחוב סוקולוב 3', neighborhood: 'מרכז',
     substitute_first_name: 'מרים', substitute_last_name: 'אברהם', substitute_phone: '054-1234567',
-    notes: null,
+    manager_first_name: 'מיכל', manager_last_name: 'לוי',
+    hours_worked: null, hourly_rate: null, total_pay: null,
+    notes: null, substitute_confirmed_at: null, substitute_arrived_at: null,
   },
   {
     id: 'asgn-5', absence_id: null, assignment_date: d(5),
@@ -113,7 +121,9 @@ export const DEMO_ASSIGNMENTS = [
     kindergarten_id: 'kg-1', kindergarten_name: 'גן חבצלת',
     kindergarten_address: 'רחוב הרצל 15', neighborhood: 'מרכז',
     substitute_first_name: 'מרים', substitute_last_name: 'אברהם', substitute_phone: '054-1234567',
-    notes: null,
+    manager_first_name: 'דנה', manager_last_name: 'שרון',
+    hours_worked: null, hourly_rate: null, total_pay: null,
+    notes: null, substitute_confirmed_at: null, substitute_arrived_at: null,
   },
 ];
 
@@ -184,9 +194,9 @@ export const DEMO_SUB_PROFILE = {
 };
 
 // ─── Substitute availability (unavailable dates) ──────────────
-export const DEMO_AVAILABILITY: { date: string; is_available: boolean }[] = [
-  { date: d(3), is_available: false },
-  { date: d(8), is_available: false },
+export const DEMO_AVAILABILITY: { id: string; date: string; is_available: boolean; reason: string | null }[] = [
+  { id: 'avail-1', date: d(3), is_available: false, reason: 'personal' },
+  { id: 'avail-2', date: d(8), is_available: false, reason: 'vacation' },
 ];
 
 // ─── Substitutes paginated (for SubstitutesPage) ──────────────
@@ -243,17 +253,23 @@ export const DEMO_SUBSTITUTES_PAGINATED = {
 export const DEMO_KNOWN_ABSENCES = [
   {
     id: 'ka-1', kindergarten_id: 'kg-1', kindergarten_name: 'גן חבצלת',
-    employee_name: 'יעל כהן', reason: 'training', start_date: d(7), end_date: d(7),
-    notes: 'השתלמות גננות', created_at: new Date().toISOString(),
+    neighborhood: 'מרכז', employee_name: 'יעל כהן', employee_role: 'teacher' as const,
+    reason: 'vacation', start_date: d(7), end_date: d(7),
+    notes: 'השתלמות גננות', creator_first_name: 'דנה', creator_last_name: 'שרון',
+    created_at: new Date().toISOString(),
   },
   {
     id: 'ka-2', kindergarten_id: 'kg-2', kindergarten_name: 'גן נרקיס',
-    employee_name: 'תמר שלום', reason: 'vacation', start_date: d(14), end_date: d(16),
-    notes: 'חופשה שנתית', created_at: new Date().toISOString(),
+    neighborhood: 'צפון', employee_name: 'תמר שלום', employee_role: 'teacher' as const,
+    reason: 'vacation', start_date: d(14), end_date: d(16),
+    notes: 'חופשה שנתית', creator_first_name: 'יעל', creator_last_name: 'רז',
+    created_at: new Date().toISOString(),
   },
   {
     id: 'ka-3', kindergarten_id: 'kg-3', kindergarten_name: 'גן רקפת',
-    employee_name: 'חנה ברק', reason: 'medical', start_date: d(3), end_date: d(5),
-    notes: 'ניתוח מתוכנן', created_at: new Date().toISOString(),
+    neighborhood: 'דרום', employee_name: 'חנה ברק', employee_role: 'assistant' as const,
+    reason: 'other', start_date: d(3), end_date: d(5),
+    notes: 'ניתוח מתוכנן', creator_first_name: 'רות', creator_last_name: 'כהן',
+    created_at: new Date().toISOString(),
   },
 ];
