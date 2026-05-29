@@ -112,7 +112,7 @@ router.get('/available', requireRole('manager', 'authority_admin', 'super_admin'
   const result = await query(`
     SELECT
       s.id, s.neighborhood, s.work_permit_valid, s.work_permit_expiry,
-      s.education_level, s.total_assignments,
+      s.education_level, s.total_assignments, s.rating,
       u.first_name, u.last_name, u.phone,
       NOT EXISTS(
         SELECT 1 FROM substitute_availability sa

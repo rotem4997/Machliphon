@@ -10,6 +10,7 @@
     "db:seed": "ts-node src/db/seed.ts",
     "db:seed-full": "ts-node src/db/seed-full.ts",
     "db:seed-scale": "ts-node src/db/seed-scale.ts",
+    "db:seed-test-users": "ts-node src/db/seed-test-users.ts",
     "ml:agent": "ts-node src/ml/agent/test-agent.ts",
     "ml:agent:json": "ML_AGENT_JSON=1 ts-node src/ml/agent/test-agent.ts"
   },

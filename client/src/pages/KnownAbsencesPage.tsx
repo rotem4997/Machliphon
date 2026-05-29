@@ -48,7 +48,8 @@ export default function KnownAbsencesPage() {
     startDate: '', endDate: '', reason: 'vacation', notes: '',
   });
   const queryClient = useQueryClient();
-  const { isDemoMode } = useAuthStore();
+  const { isDemoMode, user } = useAuthStore();
+  const isManager = user?.role === 'manager';
 
   const { data: knownAbsences = [], isLoading, isError } = useQuery<KnownAbsence[]>({
     queryKey: ['known-absences'],
@@ -56,11 +57,20 @@ export default function KnownAbsencesPage() {
   });
 
   const { data: kindergartens = [] } = useQuery<Kindergarten[]>({
-    queryKey: ['kindergartens-my'],
-    queryFn: () => api.get('/manager-kindergartens/my').then(r => r.data).catch(() =>
-      api.get('/kindergartens').then(r => r.data).catch(() => isDemoMode ? DEMO_KINDERGARTENS as Kindergarten[] : [])
-    ),
+    queryKey: ['kindergartens-for-known-absences', isManager],
+    queryFn: () => {
+      const endpoint = isManager ? '/manager-kindergartens/my' : '/kindergartens';
+      return api.get(endpoint).then(r => r.data).catch(() => isDemoMode ? DEMO_KINDERGARTENS as Kindergarten[] : []);
+    },
   });
+
+  const handleCreate = () => {
+    if (form.endDate && form.startDate && form.endDate < form.startDate) {
+      toast.error('תאריך הסיום חייב להיות אחרי תאריך ההתחלה');
+      return;
+    }
+    createMutation.mutate();
+  };
 
   const createMutation = useMutation({
     mutationFn: () => api.post('/known-absences', {
@@ -78,7 +88,10 @@ export default function KnownAbsencesPage() {
       setForm({ kindergartenId: '', employeeName: '', employeeRole: 'teacher', startDate: '', endDate: '', reason: 'vacation', notes: '' });
       queryClient.invalidateQueries({ queryKey: ['known-absences'] });
     },
-    onError: (err: any) => toast.error(err?.response?.data?.error || 'שגיאה ביצירת החופש'),
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg || 'שגיאה ביצירת החופש');
+    },
   });
 
   const deleteMutation = useMutation({
@@ -212,7 +225,7 @@ export default function KnownAbsencesPage() {
             <div className="flex gap-2 justify-end">
               <button onClick={() => setShowCreate(false)} className="btn-secondary text-sm">ביטול</button>
               <button
-                onClick={() => createMutation.mutate()}
+                onClick={handleCreate}
                 disabled={!form.kindergartenId || !form.employeeName || !form.startDate || !form.endDate || createMutation.isPending}
                 className="btn-primary text-sm disabled:opacity-50"
               >

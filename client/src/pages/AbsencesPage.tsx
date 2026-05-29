@@ -89,6 +89,9 @@ export default function AbsencesPage() {
         params: {
           page,
           limit: LIMIT,
+          ...(filterStatus ? { status: filterStatus } : {}),
+          ...(filterReason ? { reason: filterReason } : {}),
+          ...(search ? { search } : {}),
         },
       })
         .then(r => r.data as PaginatedAbsences | AbsenceReport[])

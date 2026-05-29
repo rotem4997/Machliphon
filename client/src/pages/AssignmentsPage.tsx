@@ -82,7 +82,7 @@ export default function AssignmentsPage() {
     const kgId = searchParams.get('kindergartenId');
     const open = searchParams.get('openModal');
     if (date && open === 'true') {
-      const parsed = new Date(date);
+      const parsed = parseISO(date);
       if (!isNaN(parsed.getTime())) {
         setSelectedDate(parsed);
         setWeekStart(startOfWeek(parsed, { weekStartsOn: 0 }));

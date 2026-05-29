@@ -38,16 +38,33 @@ router.get('/', asyncHandler(async (req: AuthRequest, res: Response) => {
       u_sub.phone as substitute_phone,
       u_mgr.first_name as manager_first_name, u_mgr.last_name as manager_last_name`;
 
-  let baseSql = `
+  // Managers see only their assigned KGs; authority_admins see all authority KGs
+  let baseSql: string;
+  const params: unknown[] = [authorityId];
+  let paramIdx = 2;
+
+  if (req.user!.role === 'manager') {
+    baseSql = `
+    FROM assignments a
+    JOIN kindergartens k ON a.kindergarten_id = k.id
+    JOIN substitutes s ON a.substitute_id = s.id
+    JOIN users u_sub ON s.user_id = u_sub.id
+    JOIN users u_mgr ON a.assigned_by = u_mgr.id
+    JOIN managers mgr ON mgr.user_id = $${paramIdx++}
+    JOIN manager_kindergartens mk ON mk.manager_id = mgr.id AND mk.kindergarten_id = k.id
+    WHERE k.authority_id = $1
+    `;
+    params.push(req.user!.id);
+  } else {
+    baseSql = `
     FROM assignments a
     JOIN kindergartens k ON a.kindergarten_id = k.id
     JOIN substitutes s ON a.substitute_id = s.id
     JOIN users u_sub ON s.user_id = u_sub.id
     JOIN users u_mgr ON a.assigned_by = u_mgr.id
     WHERE k.authority_id = $1
-  `;
-  const params: unknown[] = [authorityId];
-  let paramIdx = 2;
+    `;
+  }
 
   if (date) {
     baseSql += ` AND a.assignment_date = $${paramIdx++}`;
@@ -124,11 +141,22 @@ router.post('/', requireRole('manager', 'authority_admin', 'super_admin'), async
   if (!subCheck.rows[0].work_permit_valid) {
     throw new ValidationError('למחליפה אין תיק עובד תקף.', { source: 'POST /api/assignments', detail: `Substitute ${substituteId} permit invalid` });
   }
-  // Verify the target kindergarten belongs to the requester's authority
-  const kgAuthCheck = await query(
-    'SELECT id FROM kindergartens WHERE id = $1 AND authority_id = $2 AND is_active = true',
-    [kindergartenId, req.user!.authority_id]
-  );
+  // Verify the target kindergarten belongs to the requester's authority (and manager's assigned KGs)
+  let kgAuthCheck;
+  if (req.user!.role === 'manager') {
+    kgAuthCheck = await query(
+      `SELECT k.id FROM kindergartens k
+       JOIN managers mgr ON mgr.user_id = $2
+       JOIN manager_kindergartens mk ON mk.manager_id = mgr.id AND mk.kindergarten_id = k.id
+       WHERE k.id = $1 AND k.authority_id = $3 AND k.is_active = true`,
+      [kindergartenId, req.user!.id, req.user!.authority_id]
+    );
+  } else {
+    kgAuthCheck = await query(
+      'SELECT id FROM kindergartens WHERE id = $1 AND authority_id = $2 AND is_active = true',
+      [kindergartenId, req.user!.authority_id]
+    );
+  }
   if (kgAuthCheck.rows.length === 0) {
     throw new NotFoundError('גן ילדים לא נמצא.', { source: 'POST /api/assignments', detail: `Kindergarten ${kindergartenId} not found in authority ${req.user!.authority_id}` });
   }
@@ -299,10 +327,11 @@ router.patch('/:id/substitute-cancel', requireRole('substitute'), asyncHandler(a
   const kgId = result.rows[0].kindergarten_id;
   const admins = await query(`SELECT u.id FROM users u JOIN kindergartens k ON u.authority_id = k.authority_id WHERE k.id = $1 AND u.role IN ('manager','authority_admin')`, [kgId]);
   const kgRes = await query('SELECT name FROM kindergartens WHERE id = $1', [kgId]);
-  const subName = `${result.rows[0].substitute_id}`;
+  const subUserRes = await query('SELECT u.first_name, u.last_name FROM users u JOIN substitutes s ON s.user_id = u.id WHERE s.id = $1', [subResult.rows[0].id]);
+  const subName = subUserRes.rows[0] ? `${subUserRes.rows[0].first_name} ${subUserRes.rows[0].last_name}` : 'מחליפה';
   for (const adm of admins.rows) {
     await query(`INSERT INTO notifications (user_id, type, title, message, data) VALUES ($1,'assignment_cancelled','שיבוץ בוטל על ידי מחליפה',$2,$3)`,
-      [adm.id, `שיבוץ ל${kgRes.rows[0]?.name || 'גן'} בוטל. סיבה: ${reason || 'ללא סיבה'}.`, JSON.stringify({ assignmentId: req.params.id })]);
+      [adm.id, `${subName} ביטלה את השיבוץ ל${kgRes.rows[0]?.name || 'גן'}. סיבה: ${reason || 'ללא סיבה'}.`, JSON.stringify({ assignmentId: req.params.id })]);
   }
   return res.json({ message: 'ביטול בוצע.' });
 }));

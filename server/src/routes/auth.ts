@@ -145,12 +145,13 @@ router.get('/me', authenticate, asyncHandler(async (req: AuthRequest, res: Respo
 // PATCH /api/auth/me — A5: update own profile (name, phone; address for substitutes)
 router.patch('/me', authenticate, asyncHandler(async (req: AuthRequest, res: Response) => {
   const { firstName, lastName, phone, address } = req.body;
-  if (firstName) {
-    await query(
-      'UPDATE users SET first_name = $1, last_name = $2, phone = $3, updated_at = NOW() WHERE id = $4',
-      [firstName, lastName || req.user!.last_name, phone || null, req.user!.id]
-    );
+  if (!firstName?.trim()) {
+    throw new ValidationError('שם פרטי הוא שדה חובה.', { source: 'PATCH /auth/me', detail: 'firstName is empty' });
   }
+  await query(
+    'UPDATE users SET first_name = $1, last_name = $2, phone = $3, updated_at = NOW() WHERE id = $4',
+    [firstName.trim(), (lastName ?? req.user!.last_name).trim(), phone || null, req.user!.id]
+  );
   if (address && req.user!.role === 'substitute') {
     await query('UPDATE substitutes SET address = $1, updated_at = NOW() WHERE user_id = $2', [address, req.user!.id]);
   }

@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle, XCircle, Calendar, MapPin, Clock,
-  ChevronRight, ChevronLeft, Camera, Edit3, List, LayoutGrid, Save, X,
+  ChevronRight, ChevronLeft, Edit3, List, LayoutGrid, Save, X,
 } from 'lucide-react';
 import api, { handleApiError } from '@/utils/api';
 import { useAuthStore } from '@/context/authStore';
@@ -39,15 +39,12 @@ export default function SubstituteDashboard() {
   const [currentDate, setCurrentDate] = useState(today);
   const [selectedDay, setSelectedDay] = useState<Date>(today);
   const [editingProfile, setEditingProfile] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   // Profile edit state
   const [profileForm, setProfileForm] = useState({
     first_name: '',
     last_name: '',
     email: '',
     phone: '',
-    photo_url: '',
   });
 
   const { isDemoMode } = useAuthStore();
@@ -96,7 +93,6 @@ export default function SubstituteDashboard() {
         last_name: profile.last_name || '',
         email: profile.email || '',
         phone: profile.phone || '',
-        photo_url: profile.photo_url || '',
       });
     } else if (authUser) {
       setProfileForm(prev => ({
@@ -130,11 +126,10 @@ export default function SubstituteDashboard() {
     last_name: authUser.lastName,
     email: authUser.email,
     phone: authUser.phone || '',
-    photo_url: '',
     work_permit_valid: true,
     work_permit_expiry: '2027-01-01',
     total_assignments: 0,
-  } : { first_name: '', last_name: '', email: '', phone: '', photo_url: '', work_permit_valid: true, work_permit_expiry: '2027-01-01', total_assignments: 0 });
+  } : { first_name: '', last_name: '', email: '', phone: '', work_permit_valid: true, work_permit_expiry: '2027-01-01', total_assignments: 0 });
 
   const confirmAssignment = useMutation({
     mutationFn: (id: string) => api.patch(`/assignments/${id}/confirm`),
@@ -222,19 +217,6 @@ export default function SubstituteDashboard() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // ─── Photo upload handler ─────────────────────────────────
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (profileForm.photo_url?.startsWith('blob:')) {
-        URL.revokeObjectURL(profileForm.photo_url);
-      }
-      const url = URL.createObjectURL(file);
-      setProfileForm(prev => ({ ...prev, photo_url: url }));
-      toast.success('תמונה הועלתה בהצלחה');
-    }
-  };
 
   const saveProfileMutation = useMutation({
     mutationFn: () => api.patch('/auth/me', {
@@ -539,7 +521,7 @@ export default function SubstituteDashboard() {
 
                   return (
                     <div
-                      key={dateStr}
+                      key={assignment.id}
                       className={`flex items-center gap-3 py-3 px-4 rounded-xl transition-all ${
                         isToday ? 'bg-mint-50 border border-mint-200' : 'bg-slate-50'
                       }`}
@@ -637,35 +619,12 @@ export default function SubstituteDashboard() {
               )}
             </div>
 
-            {/* Photo */}
+            {/* Avatar */}
             <div className="flex justify-center mb-4">
-              <div className="relative">
-                <div className="w-20 h-20 rounded-full bg-navy-900 flex items-center justify-center overflow-hidden">
-                  {profileForm.photo_url ? (
-                    <img src={profileForm.photo_url} alt="profile" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-2xl font-bold text-mint-400">
-                      {(p.first_name || 'ש')[0]}
-                    </span>
-                  )}
-                </div>
-                {editingProfile && (
-                  <>
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      className="absolute -bottom-1 -left-1 bg-mint-500 text-white rounded-full p-1.5 shadow-md hover:bg-mint-600"
-                    >
-                      <Camera size={12} />
-                    </button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handlePhotoUpload}
-                    />
-                  </>
-                )}
+              <div className="w-20 h-20 rounded-full bg-navy-900 flex items-center justify-center">
+                <span className="text-2xl font-bold text-mint-400">
+                  {(p.first_name || 'ש')[0]}
+                </span>
               </div>
             </div>
 
