@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, AlertCircle, User, Building } from 'lucide-react';
+import { Plus, Trash2, AlertCircle, User, Building, Search } from 'lucide-react';
 import api from '@/utils/api';
 import KindergartenCombobox from '@/components/KindergartenCombobox';
 import { useAuthStore } from '@/context/authStore';
@@ -36,6 +36,7 @@ interface Kindergarten {
 export default function ManagerKindergartensPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ managerId: '', kindergartenId: '' });
+  const [kgSearch, setKgSearch] = useState('');
   const queryClient = useQueryClient();
 
   const { isDemoMode } = useAuthStore();
@@ -120,7 +121,14 @@ export default function ManagerKindergartensPage() {
             <p>אין שיוכים מוגדרים</p>
           </div>
         ) : (
-          Object.entries(byManager).map(([managerId, { manager, kindergartens: kgs }]) => (
+          Object.entries(byManager).map(([managerId, { manager, kindergartens: kgs }]) => {
+            const filteredKgs = kgSearch
+              ? kgs.filter(kg =>
+                  kg.kindergarten_name.toLowerCase().includes(kgSearch.toLowerCase()) ||
+                  (kg.neighborhood && kg.neighborhood.toLowerCase().includes(kgSearch.toLowerCase()))
+                )
+              : kgs;
+            return (
             <div key={managerId} className="card p-5">
               <div className="flex items-start justify-between mb-3">
                 <div>
@@ -134,8 +142,21 @@ export default function ManagerKindergartensPage() {
                 <span className="text-xs text-slate-500">{kgs.length} גנים</span>
               </div>
 
+              {kgs.length >= 10 && (
+                <div className="relative mb-3">
+                  <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="חיפוש גן..."
+                    value={kgSearch}
+                    onChange={e => setKgSearch(e.target.value)}
+                    className="input pr-8 py-2 text-sm w-full"
+                  />
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                {kgs.map(kg => (
+                {filteredKgs.map(kg => (
                   <div key={kg.kindergarten_id} className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <Building size={13} className="text-slate-400 flex-shrink-0" />
@@ -152,9 +173,13 @@ export default function ManagerKindergartensPage() {
                     </button>
                   </div>
                 ))}
+                {filteredKgs.length === 0 && kgSearch && (
+                  <p className="text-sm text-slate-400 col-span-3 py-2 text-center">אין גנים התואמים לחיפוש</p>
+                )}
               </div>
             </div>
-          ))
+            );
+          })
         )}
       </div>
 
