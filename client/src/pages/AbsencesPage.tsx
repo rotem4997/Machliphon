@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Search, Plus, X, Calendar, MapPin, User, Filter,
-  AlertTriangle, Clock, CheckCircle, Loader2,
+  AlertTriangle, Clock, CheckCircle, Loader2, UserPlus,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import api, { handleApiError } from '@/utils/api';
 import { useAuthStore } from '@/context/authStore';
 import { DEMO_ABSENCES, DEMO_KINDERGARTENS } from '@/utils/demoData';
@@ -69,6 +70,7 @@ const statusConfig: Record<string, { label: string; cls: string; icon: typeof Ch
 export default function AbsencesPage() {
   const queryClient = useQueryClient();
   const { isDemoMode } = useAuthStore();
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterReason, setFilterReason] = useState('');
@@ -267,7 +269,14 @@ export default function AbsencesPage() {
 
                   {/* Actions */}
                   {a.status === 'open' && (
-                    <div className="flex gap-2 flex-shrink-0">
+                    <div className="flex gap-2 flex-shrink-0 flex-wrap">
+                      <button
+                        onClick={() => navigate(`/assignments?date=${a.absence_date}&kindergartenId=${a.kindergarten_id}&openModal=true`)}
+                        className="text-xs px-2.5 py-1.5 rounded-lg bg-mint-50 text-mint-700 hover:bg-mint-100 border border-mint-200 transition-colors flex items-center gap-1"
+                      >
+                        <UserPlus size={12} />
+                        שבץ מחליפה
+                      </button>
                       <button
                         onClick={() => updateStatusMutation.mutate({ id: a.id, status: 'uncovered' })}
                         disabled={updateStatusMutation.isPending}

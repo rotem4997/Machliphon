@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import {
   Calendar, Plus, CheckCircle, XCircle, Clock, MapPin,
   ChevronRight, ChevronLeft, User, Phone, X, AlertCircle, Star
@@ -64,14 +65,34 @@ const statusConfig: Record<string, { label: string; cls: string }> = {
 };
 
 export default function AssignmentsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 0 }));
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [completeModal, setCompleteModal] = useState<Assignment | null>(null);
+  const [prefilledKgId, setPrefilledKgId] = useState('');
 
   const queryClient = useQueryClient();
   const { isDemoMode } = useAuthStore();
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
+
+  // Deep-link from AbsencesPage: ?date=YYYY-MM-DD&kindergartenId=...&openModal=true
+  useEffect(() => {
+    const date = searchParams.get('date');
+    const kgId = searchParams.get('kindergartenId');
+    const open = searchParams.get('openModal');
+    if (date && open === 'true') {
+      const parsed = new Date(date);
+      if (!isNaN(parsed.getTime())) {
+        setSelectedDate(parsed);
+        setWeekStart(startOfWeek(parsed, { weekStartsOn: 0 }));
+      }
+      if (kgId) setPrefilledKgId(kgId);
+      setShowCreateModal(true);
+      setSearchParams({}, { replace: true });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
@@ -267,9 +288,11 @@ export default function AssignmentsPage() {
       {showCreateModal && (
         <CreateAssignmentModal
           date={dateStr}
-          onClose={() => setShowCreateModal(false)}
+          prefilledKgId={prefilledKgId}
+          onClose={() => { setShowCreateModal(false); setPrefilledKgId(''); }}
           onSuccess={() => {
             setShowCreateModal(false);
+            setPrefilledKgId('');
             queryClient.invalidateQueries({ queryKey: ['assignments'] });
           }}
         />
@@ -336,14 +359,16 @@ function CompleteModal({
 /* ────── Create Assignment Modal ────── */
 function CreateAssignmentModal({
   date,
+  prefilledKgId = '',
   onClose,
   onSuccess,
 }: {
   date: string;
+  prefilledKgId?: string;
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const [kindergartenId, setKindergartenId] = useState('');
+  const [kindergartenId, setKindergartenId] = useState(prefilledKgId);
   const [substituteId, setSubstituteId] = useState('');
   const [startTime, setStartTime] = useState('07:30');
   const [endTime, setEndTime] = useState('14:00');
