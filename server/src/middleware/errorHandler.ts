@@ -21,11 +21,12 @@ interface ErrorResponse {
  * Classify raw / unknown errors into a structured format for logging.
  */
 function classifyError(err: Error, req: Request): { statusCode: number; userMessage: string; debugInfo: ErrorDebugInfo } {
-  // Database connection errors
-  if (err.message?.includes('ECONNREFUSED') || err.message?.includes('connection') && err.message?.includes('terminated')) {
+  // Database connection / startup errors (covers Render/Railway cold-start)
+  const dbConnPatterns = ['ECONNREFUSED', 'connection terminated', 'Connection terminated', 'ETIMEDOUT', 'connect ETIMEDOUT', 'getaddrinfo', 'ENOTFOUND'];
+  if (dbConnPatterns.some(p => err.message?.includes(p))) {
     return {
       statusCode: 503,
-      userMessage: 'המערכת אינה זמינה כרגע. אנא נסה שנית בעוד מספר דקות.',
+      userMessage: 'השרת מתחבר למסד הנתונים. אנא נסה שנית בעוד מספר שניות.',
       debugInfo: {
         code: 'DB_CONNECTION_LOST',
         source: `${req.method} ${req.path}`,
@@ -35,8 +36,8 @@ function classifyError(err: Error, req: Request): { statusCode: number; userMess
     };
   }
 
-  // Pool exhaustion
-  if (err.message?.includes('timeout') && err.message?.includes('pool')) {
+  // Pool exhaustion / query timeout
+  if ((err.message?.includes('timeout') && err.message?.includes('pool')) || err.message?.includes('Query read timeout')) {
     return {
       statusCode: 503,
       userMessage: 'המערכת עמוסה כרגע. אנא נסה שנית.',

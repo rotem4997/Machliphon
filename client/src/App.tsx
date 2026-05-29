@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { useEffect } from 'react';
+import toast from 'react-hot-toast';
 
 import ErrorBoundary from './components/ErrorBoundary';
 import LoginPage from './pages/LoginPage';
@@ -58,7 +59,13 @@ function SmartDashboard() {
 function ForceLogoutListener() {
   const { logout } = useAuthStore();
   useEffect(() => {
-    const handler = () => logout();
+    const handler = () => {
+      toast('פג תוקף ההתחברות שלך. אנא התחבר/י מחדש.', {
+        icon: '🔒',
+        duration: 5000,
+      });
+      logout();
+    };
     window.addEventListener('machliphon:force-logout', handler);
     return () => window.removeEventListener('machliphon:force-logout', handler);
   }, [logout]);

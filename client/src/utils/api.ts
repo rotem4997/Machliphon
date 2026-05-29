@@ -30,10 +30,17 @@ export function getErrorMessage(err: unknown): string {
     }
     // Network / timeout
     if (axErr.code === 'ECONNABORTED') return 'הבקשה ארכה יותר מדי זמן. נסה שנית.';
-    if (!axErr.response) return 'אין חיבור לשרת. בדוק את החיבור לאינטרנט.';
+    if (!axErr.response) return 'לא ניתן להגיע לשרת. בדוק את חיבור האינטרנט.';
     // HTTP status fallbacks
-    if (axErr.response.status === 429) return 'יותר מדי בקשות. נסה שנית בעוד מעט.';
-    if (axErr.response.status >= 500) return 'שגיאת שרת. אנא נסה שנית.';
+    const s = axErr.response.status;
+    if (s === 400) return 'בקשה שגויה. בדוק את הנתונים ונסה שנית.';
+    if (s === 401) return 'אין הרשאה. אנא התחבר/י מחדש.';
+    if (s === 403) return 'אין לך הרשאה לבצע פעולה זו.';
+    if (s === 404) return 'הפריט המבוקש לא נמצא.';
+    if (s === 409) return 'קיים פריט עם אותם נתונים.';
+    if (s === 429) return 'יותר מדי בקשות. נסה שנית בעוד מספר דקות.';
+    if (s === 503) return 'השרת אינו זמין כרגע. נסה שנית בעוד מספר שניות.';
+    if (s >= 500) return 'שגיאת שרת פנימית. נסה שנית.';
   }
   return 'אירעה שגיאה. אנא נסה שנית.';
 }
