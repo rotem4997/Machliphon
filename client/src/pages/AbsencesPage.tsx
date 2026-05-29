@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Search, Plus, X, Calendar, MapPin, User, Filter,
@@ -34,6 +34,14 @@ interface AbsenceReport {
   created_at: string;
 }
 
+interface PaginatedAbsences {
+  data: AbsenceReport[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 interface CreateAbsenceBody {
   kindergartenId: string;
   absentEmployeeName: string;
@@ -44,6 +52,8 @@ interface CreateAbsenceBody {
 }
 
 // ─── Constants ────────────────────────────────────────────────
+const LIMIT = 20;
+
 const reasonLabels: Record<string, string> = {
   sick: 'מחלה', vacation: 'חופשה', emergency: 'חירום', known: 'ידוע מראש',
 };
@@ -63,12 +73,50 @@ export default function AbsencesPage() {
   const [filterStatus, setFilterStatus] = useState('');
   const [filterReason, setFilterReason] = useState('');
   const [showCreate, setShowCreate] = useState(false);
+  const [page, setPage] = useState(1);
 
-  const { data: absences = [], isLoading, isError } = useQuery<AbsenceReport[]>({
-    queryKey: ['absences'],
-    queryFn: () => api.get('/absences').then(r => r.data)
-      .catch(() => isDemoMode ? DEMO_ABSENCES as AbsenceReport[] : []),
+  // Reset to page 1 whenever a filter changes
+  useEffect(() => {
+    setPage(1);
+  }, [search, filterStatus, filterReason]);
+
+  const { data: paginatedData, isLoading, isError } = useQuery<PaginatedAbsences | AbsenceReport[]>({
+    queryKey: ['absences', page, filterStatus, filterReason, search],
+    queryFn: () =>
+      api.get('/absences', {
+        params: {
+          page,
+          limit: LIMIT,
+        },
+      })
+        .then(r => r.data as PaginatedAbsences | AbsenceReport[])
+        .catch(() =>
+          isDemoMode
+            ? ({ data: DEMO_ABSENCES as AbsenceReport[], total: DEMO_ABSENCES.length, page: 1, limit: LIMIT, totalPages: 1 } satisfies PaginatedAbsences)
+            : ({ data: [], total: 0, page: 1, limit: LIMIT, totalPages: 1 } satisfies PaginatedAbsences)
+        ),
+    staleTime: 30_000,
   });
+
+  // Normalise paginated vs legacy array response
+  const isPaginated = paginatedData !== undefined && !Array.isArray(paginatedData);
+  const pageAbsences: AbsenceReport[] = isPaginated
+    ? (paginatedData as PaginatedAbsences).data
+    : ((paginatedData as AbsenceReport[]) ?? []);
+  const totalPages: number = isPaginated ? (paginatedData as PaginatedAbsences).totalPages : 1;
+  const totalCount: number = isPaginated ? (paginatedData as PaginatedAbsences).total : pageAbsences.length;
+
+  // Client-side filtering on the current page's data
+  const filtered = pageAbsences.filter(a => {
+    if (search && !`${a.absent_employee_name} ${a.kindergarten_name}`.includes(search)) return false;
+    if (filterStatus && a.status !== filterStatus) return false;
+    if (filterReason && a.absence_reason !== filterReason) return false;
+    return true;
+  }).sort((a, b) => b.absence_date.localeCompare(a.absence_date));
+
+  const openCount = pageAbsences.filter(a => a.status === 'open').length;
+  const coveredCount = pageAbsences.filter(a => a.status === 'covered' || a.status === 'assigned').length;
+  const uncoveredCount = pageAbsences.filter(a => a.status === 'uncovered').length;
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/absences/${id}`),
@@ -88,17 +136,6 @@ export default function AbsencesPage() {
     },
     onError: (err) => handleApiError(err, 'PATCH /api/absences/:id'),
   });
-
-  const filtered = absences.filter(a => {
-    if (search && !`${a.absent_employee_name} ${a.kindergarten_name}`.includes(search)) return false;
-    if (filterStatus && a.status !== filterStatus) return false;
-    if (filterReason && a.absence_reason !== filterReason) return false;
-    return true;
-  }).sort((a, b) => b.absence_date.localeCompare(a.absence_date));
-
-  const openCount = absences.filter(a => a.status === 'open').length;
-  const coveredCount = absences.filter(a => a.status === 'covered' || a.status === 'assigned').length;
-  const uncoveredCount = absences.filter(a => a.status === 'uncovered').length;
 
   if (isLoading) {
     return (
@@ -130,7 +167,7 @@ export default function AbsencesPage() {
         <div>
           <h1 className="text-2xl font-black text-navy-900">היעדרויות</h1>
           <p className="text-slate-500 text-sm mt-0.5">
-            {absences.length} דיווחים
+            {totalCount} דיווחים
             {openCount > 0 && <span className="text-amber-600 font-medium"> · {openCount} פתוחים</span>}
           </p>
         </div>
@@ -267,6 +304,31 @@ export default function AbsencesPage() {
                 + דיווח חדש
               </button>
             )}
+          </div>
+        )}
+
+        {/* Pagination controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
+            <p className="text-sm text-slate-500">
+              {totalCount} תוצאות · עמוד {page} מתוך {totalPages}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="btn-secondary text-sm px-3 py-1.5 disabled:opacity-40"
+              >
+                הקודם
+              </button>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="btn-secondary text-sm px-3 py-1.5 disabled:opacity-40"
+              >
+                הבא
+              </button>
+            </div>
           </div>
         )}
       </div>

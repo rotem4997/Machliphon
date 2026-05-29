@@ -4,6 +4,7 @@ import { Plus, X, Calendar, AlertCircle, Trash2 } from 'lucide-react';
 import api from '@/utils/api';
 import { useAuthStore } from '@/context/authStore';
 import { DEMO_KNOWN_ABSENCES, DEMO_KINDERGARTENS } from '@/utils/demoData';
+import KindergartenCombobox from '@/components/KindergartenCombobox';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -162,10 +163,13 @@ export default function KnownAbsencesPage() {
 
             <div>
               <label className="label">גן ילדים</label>
-              <select className="input" value={form.kindergartenId} onChange={e => setForm(p => ({ ...p, kindergartenId: e.target.value }))}>
-                <option value="">בחר גן...</option>
-                {kindergartens.map(kg => <option key={kg.id} value={kg.id}>{kg.name}</option>)}
-              </select>
+              <KindergartenCombobox
+                kindergartens={kindergartens}
+                value={form.kindergartenId}
+                onChange={id => setForm(p => ({ ...p, kindergartenId: id }))}
+                placeholder="בחר גן..."
+                required
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
